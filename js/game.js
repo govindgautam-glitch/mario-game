@@ -16,7 +16,7 @@ class Game {
         this.state = 'LOADING'; // LOADING, TITLE, PLAYING, MODAL, VICTORY, GAMEOVER, PAUSED
 
         // Player Name & Score State
-        this.playerName = localStorage.getItem('studio_mario_player_name') || '';
+        this.playerName = localStorage.getItem('studio_mario_player_name') || 'Mario';
         this.highScore = parseInt(localStorage.getItem('studio_mario_high_score') || '0', 10);
         this.isNewHighScore = false;
 

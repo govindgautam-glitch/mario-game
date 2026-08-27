@@ -215,10 +215,11 @@ class UIManager {
         if (this.livesEl) this.livesEl.innerText = `x${lives}`;
     }
 
-    showStartScreen(savedName = '', leaderboard = []) {
+    showStartScreen(savedName = 'Mario', leaderboard = []) {
         this.hideAllScreens();
+        const initialName = savedName || 'Mario';
         if (this.nameInput) {
-            this.nameInput.value = savedName;
+            this.nameInput.value = initialName;
             this.validateNameInput();
         }
         this.renderLeaderboard('start-leaderboard-list', leaderboard);
