@@ -202,13 +202,18 @@ class Player {
         const solids = level.getNearbySolids(this.x, this.y);
 
         for (const solid of solids) {
+            // Fix #1: Exclude ground from horizontal wall checks to prevent teleporting/snapping
+            if (solid.type === 'ground') continue;
+
             if (this.intersects(bounds, solid)) {
-                if (this.vx > 0) {
-                    this.x = solid.x - this.width / 2 - solid.margin;
-                    this.vx = 0;
-                } else if (this.vx < 0) {
-                    this.x = solid.x + solid.w + this.width / 2 + solid.margin;
-                    this.vx = 0;
+                if (bounds.y + bounds.h > solid.y + 8 && bounds.y < solid.y + solid.h - 8) {
+                    if (this.vx > 0) {
+                        this.x = solid.x - this.width / 2 - solid.margin;
+                        this.vx = 0;
+                    } else if (this.vx < 0) {
+                        this.x = solid.x + solid.w + this.width / 2 + solid.margin;
+                        this.vx = 0;
+                    }
                 }
             }
         }

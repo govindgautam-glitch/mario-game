@@ -47,13 +47,18 @@ class DistractionEnemy {
         const bounds = this.getBounds();
 
         for (const solid of solids) {
+            // Fix #1: Exclude ground from horizontal obstacle collision
+            if (solid.type === 'ground') continue;
+
             if (this.intersects(bounds, solid)) {
-                if (this.vx > 0) {
-                    this.x = solid.x - this.width / 2;
-                    this.vx = -this.vx;
-                } else if (this.vx < 0) {
-                    this.x = solid.x + solid.w + this.width / 2;
-                    this.vx = -this.vx;
+                if (bounds.y + bounds.h > solid.y + 8 && bounds.y < solid.y + solid.h - 8) {
+                    if (this.vx > 0) {
+                        this.x = solid.x - this.width / 2;
+                        this.vx = -this.vx;
+                    } else if (this.vx < 0) {
+                        this.x = solid.x + solid.w + this.width / 2;
+                        this.vx = -this.vx;
+                    }
                 }
             }
         }
@@ -76,11 +81,12 @@ class DistractionEnemy {
         if (!player.isDead && !player.isInvulnerable) {
             const playerBounds = player.getBounds();
             if (this.intersects(playerBounds, bounds)) {
-                // Stomp condition: player is falling and player feet are near top of enemy
+                // Fix #2: Velocity-aware stomp threshold to prevent race condition on fast falls
                 const playerFeet = player.y + player.height;
                 const enemyTop = this.y;
+                const stompThreshold = enemyTop + Math.max(28, player.vy * dt);
 
-                if (player.vy > 0 && playerFeet <= enemyTop + 24) {
+                if (player.vy > 0 && playerFeet <= stompThreshold) {
                     this.squash();
                     player.bounceOffEnemy();
                     if (window.particleManager) {

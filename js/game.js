@@ -6,6 +6,7 @@ class Game {
         this.canvas = document.getElementById('game-canvas');
         this.ctx = this.canvas.getContext('2d');
 
+        // Fix #8: Aligned resolution (960x540)
         this.width = 960;
         this.height = 540;
         this.canvas.width = this.width;
@@ -32,7 +33,7 @@ class Game {
         this.shakeTimer = 0;
         this.shakeIntensity = 0;
 
-        this.player = new Player(80, 420);
+        this.player = new Player(80, 380);
         this.level = new Level();
 
         this.init();
@@ -61,13 +62,24 @@ class Game {
 
     resize() {
         const container = document.getElementById('canvas-container');
+        const hud = document.getElementById('hud-overlay');
         if (!container) return;
         const containerW = container.clientWidth;
         const containerH = container.clientHeight;
 
         const scale = Math.min(containerW / this.width, containerH / this.height);
-        this.canvas.style.width = `${this.width * scale}px`;
-        this.canvas.style.height = `${this.height * scale}px`;
+        const actualW = this.width * scale;
+        const actualH = this.height * scale;
+
+        this.canvas.style.width = `${actualW}px`;
+        this.canvas.style.height = `${actualH}px`;
+
+        // Fix #9: Anchor HUD overlay directly to rendered canvas bounding box on non-16:9 viewports
+        if (hud) {
+            hud.style.width = `${actualW}px`;
+            hud.style.left = `${(containerW - actualW) / 2}px`;
+            hud.style.top = `${(containerH - actualH) / 2}px`;
+        }
     }
 
     setPlayerName(name) {
@@ -145,13 +157,19 @@ class Game {
     resetGame() {
         this.player.reset();
         this.player.x = 80;
-        this.player.y = 420;
+        this.player.y = 380; // Above ground 450px
         this.level.buildLevel();
         window.particleManager.reset();
         this.camera.x = 0;
         this.camera.y = 0;
         this.time = 300;
         this.shakeTimer = 0;
+
+        // Fix #3: Guarantee background music starts/restarts on respawn or reset
+        if (window.soundManager) {
+            const currentZone = this.level.getCurrentZone ? this.level.getCurrentZone(0) : 'day';
+            window.soundManager.startMusic(currentZone || 'day');
+        }
     }
 
     addScore(pts) {
@@ -179,7 +197,7 @@ class Game {
                 window.particleManager.spawnSparkles(x, y - 10, 12, '#fbbf24');
             }
         } else {
-            const shroom = new MushroomPowerup(x - 23, y - 20, content);
+            const shroom = new MushroomPowerup(x - 21, y - 20, content);
             this.level.mushrooms.push(shroom);
         }
     }
@@ -226,6 +244,20 @@ class Game {
     }
 
     update(dt) {
+        // Fix #5: Space/Action input handling on TITLE and GAMEOVER screens
+        if (this.state === 'TITLE' && window.inputHandler.isActionJustPressed()) {
+            const name = window.uiManager.nameInput ? window.uiManager.nameInput.value.trim() : this.playerName;
+            if (name && name.length >= 1) {
+                this.start(name);
+                return;
+            }
+        }
+
+        if (this.state === 'GAMEOVER' && window.inputHandler.isActionJustPressed()) {
+            this.restart();
+            return;
+        }
+
         if (window.inputHandler.isPauseJustPressed() && (this.state === 'PLAYING' || this.state === 'PAUSED')) {
             this.isPaused = !this.isPaused;
             this.state = this.isPaused ? 'PAUSED' : 'PLAYING';

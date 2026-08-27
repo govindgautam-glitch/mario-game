@@ -39,9 +39,9 @@ class SpriteManager {
         this.totalAssets = keys.length;
 
         const promises = keys.map(key => {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
                 const img = new Image();
-                img.crossOrigin = 'anonymous';
+                // Fix #4: Removed img.crossOrigin = 'anonymous' for local bundled assets
                 img.onload = () => {
                     this.rawImages[key] = img;
                     this.loadedAssets++;
@@ -50,7 +50,6 @@ class SpriteManager {
                 };
                 img.onerror = () => {
                     console.warn(`Failed to load asset: ${assetMap[key]}`);
-                    // Fallback to avoid complete hang
                     this.rawImages[key] = img;
                     this.loadedAssets++;
                     resolve();
@@ -70,6 +69,21 @@ class SpriteManager {
         c.height = sh;
         const ctx = c.getContext('2d');
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+        return c;
+    }
+
+    createTintedCanvas(sourceCanvas, tintColor, blendMode = 'source-atop', globalAlpha = 0.5) {
+        const c = document.createElement('canvas');
+        c.width = sourceCanvas.width;
+        c.height = sourceCanvas.height;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(sourceCanvas, 0, 0);
+        ctx.save();
+        ctx.globalCompositeOperation = blendMode;
+        ctx.globalAlpha = globalAlpha;
+        ctx.fillStyle = tintColor;
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.restore();
         return c;
     }
 
@@ -103,12 +117,14 @@ class SpriteManager {
             );
         }
 
-        // Clay Brick Platform
+        // Clay Brick Platform (Day & Night)
         if (this.rawImages.brick) {
             this.sprites.brick = this.createCanvasSlice(
                 this.rawImages.brick,
                 422, 209, 357, 182
             );
+            // Night theme brick: dark crimson/purple stone texture
+            this.sprites.brickNight = this.createTintedCanvas(this.sprites.brick, '#4a0e2e', 'source-atop', 0.65);
         }
 
         // Pink Question Box
@@ -128,12 +144,17 @@ class SpriteManager {
             this.sprites.qboxEmpty = emptyC;
         }
 
-        // Pipes
+        // Pipes (Day & Night)
         if (this.rawImages.pipes) {
             const p = this.rawImages.pipes;
             this.sprites.pipeTall = this.createCanvasSlice(p, 324, 150, 149, 304);
             this.sprites.pipeMedium = this.createCanvasSlice(p, 497, 252, 145, 200);
             this.sprites.pipeHorizontal = this.createCanvasSlice(p, 663, 291, 215, 163);
+
+            // Night theme pipes: dark grey metallic / night stone
+            this.sprites.pipeTallNight = this.createTintedCanvas(this.sprites.pipeTall, '#1e293b', 'color', 0.85);
+            this.sprites.pipeMediumNight = this.createTintedCanvas(this.sprites.pipeMedium, '#1e293b', 'color', 0.85);
+            this.sprites.pipeHorizontalNight = this.createTintedCanvas(this.sprites.pipeHorizontal, '#1e293b', 'color', 0.85);
         }
 
         // Trees
@@ -146,12 +167,14 @@ class SpriteManager {
             this.sprites.treeOrange = this.createCanvasSlice(t, 656, 320, 166, 221);
         }
 
-        // Ground Tile
+        // Ground Tile (Day & Night)
         if (this.rawImages.floor) {
             this.sprites.floor = this.createCanvasSlice(
                 this.rawImages.floor,
                 0, 478, 1200, 122
             );
+            // Night theme ground: cool dark blue-purple tone
+            this.sprites.floorNight = this.createTintedCanvas(this.sprites.floor, '#1e1035', 'color', 0.7);
         }
 
         // Flagpole & Goal Building
@@ -186,7 +209,7 @@ class SpriteManager {
             beyondAbility: this.createCanvasSlice(this.rawImages.shroomBeyondAbility, 236, 20, 1065, 980)
         };
 
-        // Synthesized Coin Graphic for sparkling gold coins
+        // Synthesized Coin Graphic
         this.sprites.coinFrames = this.generateCoinFrames();
     }
 
@@ -204,19 +227,16 @@ class SpriteManager {
             ctx.save();
             ctx.translate(18, 18);
 
-            // Gold Outer rim
             ctx.fillStyle = '#f59e0b';
             ctx.beginPath();
             ctx.ellipse(0, 0, w / 2, 15, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Inner Gold highlight
             ctx.fillStyle = '#fbbf24';
             ctx.beginPath();
             ctx.ellipse(0, 0, (w * 0.75) / 2, 12, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Center star / sparkle
             if (scaleX > 0.4) {
                 ctx.fillStyle = '#fffbeb';
                 ctx.fillRect(-2 * scaleX, -7, 4 * scaleX, 14);

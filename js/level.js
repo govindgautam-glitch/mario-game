@@ -1,6 +1,7 @@
 /**
  * Level and Tilemap Engine
- * Features smooth Day-to-Night background crossfading, parallax scenery, blocks, pipes, coins, venture mushrooms, and goal elements.
+ * Features smooth Day-to-Night background & palette crossfading, classic mushroom physics,
+ * parallax scenery, blocks, pipes, coins, venture mushrooms, and goal elements.
  */
 
 class Block {
@@ -52,16 +53,28 @@ class Block {
         }
     }
 
-    draw(ctx, camera) {
+    draw(ctx, camera, nightRatio = 0) {
         const drawX = Math.round(this.x - camera.x);
         const drawY = Math.round(this.y + this.bumpY - camera.y);
 
         if (this.type === 'brick') {
-            const sprite = window.spriteManager.sprites.brick;
-            if (sprite) {
-                ctx.drawImage(sprite, drawX, drawY, this.w, this.h);
+            const spriteDay = window.spriteManager.sprites.brick;
+            const spriteNight = window.spriteManager.sprites.brickNight || spriteDay;
+
+            if (spriteDay) {
+                if (nightRatio <= 0) {
+                    ctx.drawImage(spriteDay, drawX, drawY, this.w, this.h);
+                } else if (nightRatio >= 1) {
+                    ctx.drawImage(spriteNight, drawX, drawY, this.w, this.h);
+                } else {
+                    ctx.drawImage(spriteDay, drawX, drawY, this.w, this.h);
+                    ctx.save();
+                    ctx.globalAlpha = nightRatio;
+                    ctx.drawImage(spriteNight, drawX, drawY, this.w, this.h);
+                    ctx.restore();
+                }
             } else {
-                ctx.fillStyle = '#b45309';
+                ctx.fillStyle = nightRatio > 0.5 ? '#7f1d1d' : '#b45309';
                 ctx.fillRect(drawX, drawY, this.w, this.h);
             }
         } else if (this.type === 'qbox') {
@@ -79,9 +92,10 @@ class Block {
 }
 
 class PipeSolid {
-    constructor(x, y, type = 'medium') {
+    constructor(x, y, type = 'medium', themeTarget = null) {
         this.x = x;
         this.type = type;
+        this.themeTarget = themeTarget; // 'night' or 'day'
         this.margin = 0;
 
         if (type === 'tall') {
@@ -100,17 +114,35 @@ class PipeSolid {
         this.y = y - this.h;
     }
 
-    draw(ctx, camera) {
+    draw(ctx, camera, nightRatio = 0) {
         const drawX = Math.round(this.x - camera.x);
         const drawY = Math.round(this.y - camera.y);
-        let sprite = window.spriteManager.sprites.pipeMedium;
-        if (this.type === 'tall') sprite = window.spriteManager.sprites.pipeTall;
-        if (this.type === 'horizontal') sprite = window.spriteManager.sprites.pipeHorizontal;
 
-        if (sprite) {
-            ctx.drawImage(sprite, drawX, drawY, this.w, this.h);
+        let spriteDay = window.spriteManager.sprites.pipeMedium;
+        let spriteNight = window.spriteManager.sprites.pipeMediumNight || spriteDay;
+
+        if (this.type === 'tall') {
+            spriteDay = window.spriteManager.sprites.pipeTall;
+            spriteNight = window.spriteManager.sprites.pipeTallNight || spriteDay;
+        } else if (this.type === 'horizontal') {
+            spriteDay = window.spriteManager.sprites.pipeHorizontal;
+            spriteNight = window.spriteManager.sprites.pipeHorizontalNight || spriteDay;
+        }
+
+        if (spriteDay) {
+            if (nightRatio <= 0) {
+                ctx.drawImage(spriteDay, drawX, drawY, this.w, this.h);
+            } else if (nightRatio >= 1) {
+                ctx.drawImage(spriteNight, drawX, drawY, this.w, this.h);
+            } else {
+                ctx.drawImage(spriteDay, drawX, drawY, this.w, this.h);
+                ctx.save();
+                ctx.globalAlpha = nightRatio;
+                ctx.drawImage(spriteNight, drawX, drawY, this.w, this.h);
+                ctx.restore();
+            }
         } else {
-            ctx.fillStyle = '#22c55e';
+            ctx.fillStyle = nightRatio > 0.5 ? '#334155' : '#22c55e';
             ctx.fillRect(drawX, drawY, this.w, this.h);
         }
     }
@@ -132,7 +164,7 @@ class CoinItem {
 
     triggerPop() {
         this.isPopping = true;
-        this.popVy = -400;
+        this.popVy = -420;
     }
 
     update(dt, player) {
@@ -141,8 +173,8 @@ class CoinItem {
 
         if (this.isPopping) {
             this.popY += this.popVy * dt;
-            this.popVy += 1200 * dt;
-            if (this.popVy > 200) {
+            this.popVy += 1300 * dt;
+            if (this.popVy > 220) {
                 this.isCollected = true;
             }
             return;
@@ -197,14 +229,15 @@ class MushroomPowerup {
     constructor(x, y, ventureType) {
         this.x = x;
         this.y = y;
-        this.w = 46;
-        this.h = 44;
+        this.w = 42;
+        this.h = 42;
         this.ventureType = ventureType;
         this.emerging = true;
-        this.emergeTargetY = y - 48;
-        this.vy = -65;
+        this.emergeTargetY = y - 44;
+        this.vy = -60;
+        this.vx = 90; // Steady continuous rightward walking speed
         this.isCollected = false;
-        this.bobTimer = 0;
+        this.onGround = false;
     }
 
     update(dt, level, player) {
@@ -215,21 +248,59 @@ class MushroomPowerup {
             if (this.y <= this.emergeTargetY) {
                 this.y = this.emergeTargetY;
                 this.emerging = false;
+                this.vy = 0;
                 if (window.soundManager) window.soundManager.playPowerupAppear();
             }
-            return;
+        } else {
+            // Horizontal movement and wall bouncing
+            this.x += this.vx * dt;
+
+            const solids = level.getNearbySolids(this.x, this.y);
+            const bounds = this.getBounds();
+
+            for (const solid of solids) {
+                if (solid.type === 'ground') continue;
+                if (this.intersects(bounds, solid)) {
+                    if (bounds.y + bounds.h > solid.y + 6 && bounds.y < solid.y + solid.h - 6) {
+                        if (this.vx > 0) {
+                            this.x = solid.x - this.w;
+                            this.vx = -Math.abs(this.vx); // Bounce left
+                        } else if (this.vx < 0) {
+                            this.x = solid.x + solid.w;
+                            this.vx = Math.abs(this.vx); // Bounce right
+                        }
+                    }
+                }
+            }
+
+            // Gravity & Vertical collision with ground / platforms
+            this.vy += 1200 * dt;
+            if (this.vy > 650) this.vy = 650;
+            this.y += this.vy * dt;
+
+            this.onGround = false;
+            const updatedBounds = this.getBounds();
+
+            for (const solid of solids) {
+                if (this.intersects(updatedBounds, solid)) {
+                    if (this.vy > 0 && updatedBounds.y + updatedBounds.h - this.vy * dt <= solid.y + 14) {
+                        this.y = solid.y - this.h;
+                        this.vy = 0;
+                        this.onGround = true;
+                    }
+                }
+            }
+
+            // Pit check
+            if (this.y > level.height + 100) {
+                this.isCollected = true;
+                return;
+            }
         }
 
-        this.bobTimer += dt * 4;
-        this.y += Math.sin(this.bobTimer) * 0.35;
-
+        // Collection check with player
         const pBounds = player.getBounds();
-        if (
-            pBounds.x < this.x + this.w &&
-            pBounds.x + pBounds.w > this.x &&
-            pBounds.y < this.y + this.h &&
-            pBounds.y + pBounds.h > this.y
-        ) {
+        if (this.intersects(this.getBounds(), pBounds)) {
             this.isCollected = true;
             if (window.soundManager) window.soundManager.playPowerupCollect();
             if (window.particleManager) {
@@ -243,6 +314,24 @@ class MushroomPowerup {
         }
     }
 
+    intersects(a, b) {
+        return (
+            a.x < b.x + b.w &&
+            a.x + a.w > b.x &&
+            a.y < b.y + b.h &&
+            a.y + a.h > b.y
+        );
+    }
+
+    getBounds() {
+        return {
+            x: this.x,
+            y: this.y,
+            w: this.w,
+            h: this.h
+        };
+    }
+
     draw(ctx, camera) {
         if (this.isCollected) return;
         const shrooms = window.spriteManager.sprites.mushrooms;
@@ -252,7 +341,7 @@ class MushroomPowerup {
         const drawY = Math.round(this.y - camera.y);
 
         if (sprite) {
-            ctx.drawImage(sprite, drawX - 4, drawY - 4, this.w + 8, this.h + 8);
+            ctx.drawImage(sprite, drawX - 3, drawY - 3, this.w + 6, this.h + 6);
         } else {
             ctx.fillStyle = '#ec4899';
             ctx.beginPath();
@@ -265,8 +354,8 @@ class MushroomPowerup {
 class Level {
     constructor() {
         this.width = 5200;
-        this.height = 600;
-        this.groundY = 510;
+        this.height = 540; // Fix #8: Aligned to canvas 540px
+        this.groundY = 450; // Fix #8: 450px ensures full 90px floor tile visibility
 
         this.solids = [];
         this.blocks = [];
@@ -276,8 +365,8 @@ class Level {
         this.enemies = [];
         this.trees = [];
 
-        this.flagpole = { x: 4400, y: 170, w: 46, h: 340 };
-        this.building = { x: 4620, y: 220, w: 320, h: 290 };
+        this.flagpole = { x: 4400, y: 110, w: 46, h: 340 };
+        this.building = { x: 4620, y: 160, w: 320, h: 290 };
 
         this.buildLevel();
     }
@@ -324,64 +413,64 @@ class Level {
         ];
 
         // Zone 1: Day Overworld (0px - 1600px)
-        this.addBlock(280, 360, 48, 48, 'brick');
-        this.addBlock(328, 360, 48, 48, 'qbox', 'innovher');
-        this.addBlock(376, 360, 48, 48, 'brick');
+        this.addBlock(280, 290, 48, 48, 'brick');
+        this.addBlock(328, 290, 48, 48, 'qbox', 'innovher');
+        this.addBlock(376, 290, 48, 48, 'brick');
 
-        this.addCoin(336, 300);
-        this.addCoin(520, 460, 'IRR');
-        this.addCoin(570, 460, '$ ROI');
+        this.addCoin(336, 230);
+        this.addCoin(520, 390, 'IRR');
+        this.addCoin(570, 390, '$ ROI');
 
         this.addPipe(680, this.groundY, 'short');
         this.addEnemy(800, this.groundY - 60, 110);
 
-        this.addBlock(920, 360, 48, 48, 'qbox', 'innoveda');
-        this.addBlock(968, 360, 48, 48, 'brick');
-        this.addBlock(1016, 360, 48, 48, 'brick');
-        this.addBlock(1064, 360, 48, 48, 'qbox', 'coin');
+        this.addBlock(920, 290, 48, 48, 'qbox', 'innoveda');
+        this.addBlock(968, 290, 48, 48, 'brick');
+        this.addBlock(1016, 290, 48, 48, 'brick');
+        this.addBlock(1064, 290, 48, 48, 'qbox', 'coin');
 
         this.addPipe(1180, this.groundY, 'medium');
         this.addEnemy(1300, this.groundY - 60, 80);
 
-        // Zone 2: Deep Night / Underworld (1600px - 3200px)
-        this.addPipe(1520, this.groundY, 'tall');
+        // Zone 2: Deep Night / Underworld (1600px - 3200px) - Transition Pipe into Night
+        this.addPipe(1520, this.groundY, 'tall', 'night');
         this.addEnemy(1680, this.groundY - 60, 100);
 
-        this.addBlock(1780, 390, 48, 48, 'brick');
-        this.addBlock(1828, 390, 48, 48, 'brick');
-        this.addBlock(1876, 390, 48, 48, 'qbox', 'innovidea');
+        this.addBlock(1780, 320, 48, 48, 'brick');
+        this.addBlock(1828, 320, 48, 48, 'brick');
+        this.addBlock(1876, 320, 48, 48, 'qbox', 'innovidea');
 
-        this.addCoin(1836, 340);
-        this.addCoin(1884, 340);
+        this.addCoin(1836, 260);
+        this.addCoin(1884, 260);
 
         // Staircase over Pit
-        this.addBlock(2050, 380, 48, 48, 'brick');
-        this.addBlock(2098, 340, 48, 48, 'brick');
-        this.addBlock(2146, 300, 48, 48, 'qbox', 'bharat');
-        this.addBlock(2194, 300, 48, 48, 'brick');
+        this.addBlock(2050, 310, 48, 48, 'brick');
+        this.addBlock(2098, 270, 48, 48, 'brick');
+        this.addBlock(2146, 230, 48, 48, 'qbox', 'bharat');
+        this.addBlock(2194, 230, 48, 48, 'brick');
 
-        this.addCoin(2106, 280);
-        this.addCoin(2202, 250);
+        this.addCoin(2106, 210);
+        this.addCoin(2202, 180);
 
         this.addPipe(2380, this.groundY, 'medium');
         this.addEnemy(2480, this.groundY - 60, 90);
 
         // Floating Coin Island
-        this.addBlock(2750, 360, 48, 48, 'brick');
-        this.addBlock(2798, 360, 48, 48, 'qbox', 'code');
-        this.addBlock(2846, 360, 48, 48, 'brick');
-        this.addBlock(2894, 360, 48, 48, 'brick');
+        this.addBlock(2750, 290, 48, 48, 'brick');
+        this.addBlock(2798, 290, 48, 48, 'qbox', 'code');
+        this.addBlock(2846, 290, 48, 48, 'brick');
+        this.addBlock(2894, 290, 48, 48, 'brick');
 
-        this.addCoin(2806, 300);
-        this.addCoin(2854, 300);
-        this.addCoin(2902, 300);
+        this.addCoin(2806, 230);
+        this.addCoin(2854, 230);
+        this.addCoin(2902, 230);
 
         this.addEnemy(3020, this.groundY - 60, 120);
 
-        // Zone 3: Finale Ascent & Studio i HQ (3200px - 5200px)
-        this.addPipe(3280, this.groundY, 'short');
-        this.addBlock(3420, 350, 48, 48, 'qbox', 'beyondAbility');
-        this.addBlock(3468, 350, 48, 48, 'brick');
+        // Zone 3: Finale Ascent & Studio i HQ (3200px - 5200px) - Return Pipe to Day
+        this.addPipe(3280, this.groundY, 'short', 'day');
+        this.addBlock(3420, 280, 48, 48, 'qbox', 'beyondAbility');
+        this.addBlock(3468, 280, 48, 48, 'brick');
 
         this.addEnemy(3560, this.groundY - 60, 100);
 
@@ -390,9 +479,9 @@ class Level {
         this.addPipe(3960, this.groundY, 'medium');
         this.addPipe(4080, this.groundY, 'tall');
 
-        this.addCoin(3855, 410, 'GTM');
-        this.addCoin(3975, 370, 'SCALE');
-        this.addCoin(4095, 320, 'GROW');
+        this.addCoin(3855, 340, 'GTM');
+        this.addCoin(3975, 300, 'SCALE');
+        this.addCoin(4095, 250, 'GROW');
     }
 
     addBlock(x, y, w, h, type, content = null) {
@@ -401,8 +490,8 @@ class Level {
         this.solids.push(b);
     }
 
-    addPipe(x, y, type) {
-        const p = new PipeSolid(x, y, type);
+    addPipe(x, y, type, themeTarget = null) {
+        const p = new PipeSolid(x, y, type, themeTarget);
         this.pipes.push(p);
         this.solids.push(p);
     }
@@ -502,13 +591,13 @@ class Level {
         });
 
         // 3. Ground Segments
-        this.drawGround(ctx, camera);
+        this.drawGround(ctx, camera, nightRatio);
 
         // 4. Pipes
-        this.pipes.forEach(p => p.draw(ctx, camera));
+        this.pipes.forEach(p => p.draw(ctx, camera, nightRatio));
 
         // 5. Blocks
-        this.blocks.forEach(b => b.draw(ctx, camera));
+        this.blocks.forEach(b => b.draw(ctx, camera, nightRatio));
 
         // 6. Coins & Mushrooms
         this.coins.forEach(c => c.draw(ctx, camera));
@@ -548,8 +637,9 @@ class Level {
         }
     }
 
-    drawGround(ctx, camera) {
-        const floorSprite = window.spriteManager.sprites.floor;
+    drawGround(ctx, camera, nightRatio = 0) {
+        const floorDay = window.spriteManager.sprites.floor;
+        const floorNight = window.spriteManager.sprites.floorNight || floorDay;
         const tileW = 1200;
         const tileH = 122;
 
@@ -557,17 +647,27 @@ class Level {
             const drawX = g.x - camera.x;
             const drawY = g.y - camera.y;
 
-            if (floorSprite) {
+            if (floorDay) {
                 const count = Math.ceil(g.w / tileW);
                 for (let i = 0; i < count; i++) {
                     const segX = drawX + i * tileW;
                     const segW = Math.min(tileW, g.w - i * tileW);
-                    ctx.drawImage(floorSprite, 0, 0, segW, tileH, segX, drawY, segW, tileH);
+                    if (nightRatio <= 0) {
+                        ctx.drawImage(floorDay, 0, 0, segW, tileH, segX, drawY, segW, tileH);
+                    } else if (nightRatio >= 1) {
+                        ctx.drawImage(floorNight, 0, 0, segW, tileH, segX, drawY, segW, tileH);
+                    } else {
+                        ctx.drawImage(floorDay, 0, 0, segW, tileH, segX, drawY, segW, tileH);
+                        ctx.save();
+                        ctx.globalAlpha = nightRatio;
+                        ctx.drawImage(floorNight, 0, 0, segW, tileH, segX, drawY, segW, tileH);
+                        ctx.restore();
+                    }
                 }
             } else {
-                ctx.fillStyle = '#15803d';
+                ctx.fillStyle = nightRatio > 0.5 ? '#1e1b4b' : '#15803d';
                 ctx.fillRect(drawX, drawY, g.w, 20);
-                ctx.fillStyle = '#78350f';
+                ctx.fillStyle = nightRatio > 0.5 ? '#0f172a' : '#78350f';
                 ctx.fillRect(drawX, drawY + 20, g.w, g.h - 20);
             }
         });

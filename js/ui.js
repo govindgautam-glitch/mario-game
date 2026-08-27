@@ -139,15 +139,26 @@ class UIManager {
         const joinUsBtn = document.getElementById('btn-join-us');
         if (joinUsBtn) {
             joinUsBtn.addEventListener('click', () => {
-                alert('Welcome to Studio i! Ideas stop waiting and start building.');
+                // TODO: set Studio i application/contact URL here
+                const studioIUrl = 'https://studio-i.org';
+                console.log('Navigating to Studio i application/contact URL:', studioIUrl);
+                try {
+                    window.open(studioIUrl, '_blank');
+                } catch (e) {
+                    console.log('Opened Studio i link');
+                }
             });
         }
 
         const audioToggleBtn = document.getElementById('btn-toggle-audio');
         if (audioToggleBtn) {
             audioToggleBtn.addEventListener('click', () => {
-                const muted = window.soundManager.toggleMute();
-                audioToggleBtn.innerText = muted ? '🔇 Muted' : '🔊 Audio';
+                // Fix #7: Call soundManager.init() before toggleMute() to ensure AudioContext is initialized
+                if (window.soundManager) {
+                    window.soundManager.init();
+                    const muted = window.soundManager.toggleMute();
+                    audioToggleBtn.innerText = muted ? '🔇 Muted' : '🔊 Audio';
+                }
             });
         }
     }
@@ -304,6 +315,15 @@ class UIManager {
         this.isModalOpen = false;
         if (this.typewriterInterval) clearInterval(this.typewriterInterval);
         if (this.modalEl) this.modalEl.classList.add('hidden');
+        
+        // Fix #6: Clear justPressed and jump buffer so modal dismissal with Space doesn't trigger a jump
+        if (window.inputHandler) {
+            window.inputHandler.clearJustPressed();
+        }
+        if (window.gameInstance && window.gameInstance.player) {
+            window.gameInstance.player.jumpBufferTimer = 0;
+        }
+
         if (window.gameInstance) {
             window.gameInstance.resumeFromModal();
         }
