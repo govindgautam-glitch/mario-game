@@ -427,8 +427,7 @@ class Player {
     }
 
     draw(ctx, camera) {
-        const sprites = window.spriteManager.sprites.player;
-        if (!sprites) return;
+        const sprites = window.spriteManager ? window.spriteManager.sprites.player : null;
 
         ctx.save();
         // Translate to player bottom center for natural squash & stretch
@@ -444,20 +443,22 @@ class Player {
             ctx.globalAlpha = 0.4;
         }
 
-        let spriteToDraw = sprites.idle[0];
+        let spriteToDraw = sprites ? sprites.idle[0] : null;
         let renderW = 54;
         let renderH = 74;
 
-        if (this.isDead) {
-            spriteToDraw = sprites.jump;
-        } else if (this.state === 'jump') {
-            spriteToDraw = sprites.jump;
-        } else if (this.state === 'skid') {
-            spriteToDraw = sprites.turn;
-        } else if (this.state === 'run') {
-            spriteToDraw = sprites.run[this.animFrame] || sprites.run[0];
-        } else {
-            spriteToDraw = sprites.idle[this.animFrame] || sprites.idle[0];
+        if (sprites) {
+            if (this.isDead) {
+                spriteToDraw = sprites.jump;
+            } else if (this.state === 'jump') {
+                spriteToDraw = sprites.jump;
+            } else if (this.state === 'skid') {
+                spriteToDraw = sprites.turn;
+            } else if (this.state === 'run') {
+                spriteToDraw = sprites.run[this.animFrame] || sprites.run[0];
+            } else {
+                spriteToDraw = sprites.idle[this.animFrame] || sprites.idle[0];
+            }
         }
 
         // Ground shadow
@@ -478,6 +479,16 @@ class Player {
                 renderW,
                 renderH
             );
+        } else {
+            const rawImg = window.spriteManager ? (window.spriteManager.rawImages.marioAction || window.spriteManager.rawImages.marioSheet) : null;
+            if (rawImg && rawImg.complete && rawImg.naturalWidth > 0) {
+                ctx.drawImage(rawImg, -renderW / 2, -renderH, renderW, renderH);
+            } else {
+                ctx.fillStyle = '#ec4899';
+                ctx.fillRect(-renderW / 2, -renderH, renderW, renderH);
+                ctx.fillStyle = '#fbbf24';
+                ctx.fillRect(-renderW / 4, -renderH * 0.8, renderW / 2, renderH * 0.3);
+            }
         }
 
         ctx.restore();

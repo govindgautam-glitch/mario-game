@@ -344,10 +344,12 @@ class Game {
         }
 
         if (this.state === 'TITLE') {
-            const bgDay = window.spriteManager.rawImages.bgDay;
+            const bgDay = window.spriteManager ? window.spriteManager.rawImages.bgDay : null;
             if (bgDay && bgDay.complete) {
                 this.ctx.drawImage(bgDay, 0, 0, this.width, this.height);
             }
+            this.level.draw(this.ctx, this.camera);
+            this.player.draw(this.ctx, this.camera);
             this.ctx.restore();
             return;
         }

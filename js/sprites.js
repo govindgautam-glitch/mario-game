@@ -41,7 +41,6 @@ class SpriteManager {
         const promises = keys.map(key => {
             return new Promise((resolve) => {
                 const img = new Image();
-                // Fix #4: Removed img.crossOrigin = 'anonymous' for local bundled assets
                 img.onload = () => {
                     this.rawImages[key] = img;
                     this.loadedAssets++;
@@ -52,9 +51,10 @@ class SpriteManager {
                     console.warn(`Failed to load asset: ${assetMap[key]}`);
                     this.rawImages[key] = img;
                     this.loadedAssets++;
+                    if (onProgress) onProgress(this.loadedAssets / this.totalAssets);
                     resolve();
                 };
-                img.src = assetMap[key];
+                img.src = encodeURI(assetMap[key]);
             });
         });
 
@@ -65,152 +65,169 @@ class SpriteManager {
 
     createCanvasSlice(img, sx, sy, sw, sh) {
         const c = document.createElement('canvas');
-        c.width = sw;
-        c.height = sh;
+        c.width = Math.max(1, sw);
+        c.height = Math.max(1, sh);
         const ctx = c.getContext('2d');
-        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+        if (img && img.complete && img.naturalWidth > 0) {
+            try {
+                ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+            } catch (e) {
+                console.warn('Canvas slice draw error:', e);
+            }
+        }
         return c;
     }
 
     createTintedCanvas(sourceCanvas, tintColor, blendMode = 'source-atop', globalAlpha = 0.5) {
+        if (!sourceCanvas) return null;
         const c = document.createElement('canvas');
-        c.width = sourceCanvas.width;
-        c.height = sourceCanvas.height;
+        c.width = sourceCanvas.width || 32;
+        c.height = sourceCanvas.height || 32;
         const ctx = c.getContext('2d');
-        ctx.drawImage(sourceCanvas, 0, 0);
-        ctx.save();
-        ctx.globalCompositeOperation = blendMode;
-        ctx.globalAlpha = globalAlpha;
-        ctx.fillStyle = tintColor;
-        ctx.fillRect(0, 0, c.width, c.height);
-        ctx.restore();
+        try {
+            ctx.drawImage(sourceCanvas, 0, 0);
+            ctx.save();
+            ctx.globalCompositeOperation = blendMode;
+            ctx.globalAlpha = globalAlpha;
+            ctx.fillStyle = tintColor;
+            ctx.fillRect(0, 0, c.width, c.height);
+            ctx.restore();
+        } catch (e) {
+            console.warn('Tinted canvas error:', e);
+        }
         return c;
     }
 
     sliceAllSprites() {
-        const sheet = this.rawImages.marioSheet;
+        try {
+            const sheet = this.rawImages.marioSheet;
 
-        // Player Animation Frames from Mario Model All Angles.png
-        this.sprites.player = {
-            idle: [
-                this.createCanvasSlice(sheet, 187, 88, 114, 203), // 3/4 front
-                this.createCanvasSlice(sheet, 12, 88, 140, 203)   // Front
-            ],
-            run: [
-                this.createCanvasSlice(sheet, 16, 325, 121, 170),
-                this.createCanvasSlice(sheet, 153, 322, 125, 195),
-                this.createCanvasSlice(sheet, 296, 322, 148, 173),
-                this.createCanvasSlice(sheet, 467, 321, 138, 175),
-                this.createCanvasSlice(sheet, 620, 313, 138, 195)
-            ],
-            jump: this.createCanvasSlice(sheet, 783, 312, 122, 188),
-            land: this.createCanvasSlice(sheet, 924, 355, 124, 149),
-            crouch: this.createCanvasSlice(sheet, 1071, 387, 100, 119),
-            turn: this.createCanvasSlice(sheet, 356, 88, 100, 203)
-        };
+            // Player Animation Frames from Mario Model All Angles.png
+            if (sheet && sheet.complete && sheet.naturalWidth > 0) {
+                this.sprites.player = {
+                    idle: [
+                        this.createCanvasSlice(sheet, 187, 88, 114, 203), // 3/4 front
+                        this.createCanvasSlice(sheet, 12, 88, 140, 203)   // Front
+                    ],
+                    run: [
+                        this.createCanvasSlice(sheet, 16, 325, 121, 170),
+                        this.createCanvasSlice(sheet, 153, 322, 125, 195),
+                        this.createCanvasSlice(sheet, 296, 322, 148, 173),
+                        this.createCanvasSlice(sheet, 467, 321, 138, 175),
+                        this.createCanvasSlice(sheet, 620, 313, 138, 195)
+                    ],
+                    jump: this.createCanvasSlice(sheet, 783, 312, 122, 188),
+                    land: this.createCanvasSlice(sheet, 924, 355, 124, 149),
+                    crouch: this.createCanvasSlice(sheet, 1071, 387, 100, 119),
+                    turn: this.createCanvasSlice(sheet, 356, 88, 100, 203)
+                };
+            }
 
-        // Enemy (Distraction)
-        if (this.rawImages.distraction) {
-            this.sprites.distraction = this.createCanvasSlice(
-                this.rawImages.distraction,
-                443, 49, 316, 480
-            );
+            // Enemy (Distraction)
+            if (this.rawImages.distraction) {
+                this.sprites.distraction = this.createCanvasSlice(
+                    this.rawImages.distraction,
+                    443, 49, 316, 480
+                );
+            }
+
+            // Clay Brick Platform (Day & Night)
+            if (this.rawImages.brick) {
+                this.sprites.brick = this.createCanvasSlice(
+                    this.rawImages.brick,
+                    422, 209, 357, 182
+                );
+                // Night theme brick: dark crimson/purple stone texture
+                this.sprites.brickNight = this.createTintedCanvas(this.sprites.brick, '#4a0e2e', 'source-atop', 0.65);
+            }
+
+            // Pink Question Box
+            if (this.rawImages.qbox) {
+                this.sprites.qbox = this.createCanvasSlice(
+                    this.rawImages.qbox,
+                    418, 125, 365, 343
+                );
+                // Inactive/empty box (slightly darkened)
+                const emptyC = document.createElement('canvas');
+                emptyC.width = 365;
+                emptyC.height = 343;
+                const ectx = emptyC.getContext('2d');
+                if (this.sprites.qbox) ectx.drawImage(this.sprites.qbox, 0, 0);
+                ectx.fillStyle = 'rgba(70, 40, 60, 0.45)';
+                ectx.fillRect(0, 0, 365, 343);
+                this.sprites.qboxEmpty = emptyC;
+            }
+
+            // Pipes (Day & Night)
+            if (this.rawImages.pipes) {
+                const p = this.rawImages.pipes;
+                this.sprites.pipeTall = this.createCanvasSlice(p, 324, 150, 149, 304);
+                this.sprites.pipeMedium = this.createCanvasSlice(p, 497, 252, 145, 200);
+                this.sprites.pipeHorizontal = this.createCanvasSlice(p, 663, 291, 215, 163);
+
+                // Night theme pipes: dark grey metallic / night stone
+                this.sprites.pipeTallNight = this.createTintedCanvas(this.sprites.pipeTall, '#1e293b', 'color', 0.85);
+                this.sprites.pipeMediumNight = this.createTintedCanvas(this.sprites.pipeMedium, '#1e293b', 'color', 0.85);
+                this.sprites.pipeHorizontalNight = this.createTintedCanvas(this.sprites.pipeHorizontal, '#1e293b', 'color', 0.85);
+            }
+
+            // Trees
+            if (this.rawImages.trees) {
+                const t = this.rawImages.trees;
+                this.sprites.treeGreen = this.createCanvasSlice(t, 244, 60, 209, 241);
+                this.sprites.treePink = this.createCanvasSlice(t, 488, 58, 220, 240);
+                this.sprites.treePalm = this.createCanvasSlice(t, 715, 58, 245, 245);
+                this.sprites.treePine = this.createCanvasSlice(t, 383, 320, 172, 220);
+                this.sprites.treeOrange = this.createCanvasSlice(t, 656, 320, 166, 221);
+            }
+
+            // Ground Tile (Day & Night)
+            if (this.rawImages.floor) {
+                this.sprites.floor = this.createCanvasSlice(
+                    this.rawImages.floor,
+                    0, 478, 1200, 122
+                );
+                // Night theme ground: cool dark blue-purple tone
+                this.sprites.floorNight = this.createTintedCanvas(this.sprites.floor, '#1e1035', 'color', 0.7);
+            }
+
+            // Flagpole & Goal Building
+            if (this.rawImages.flagpole) {
+                this.sprites.flagpole = this.createCanvasSlice(
+                    this.rawImages.flagpole,
+                    91, 147, 449, 992
+                );
+            }
+
+            if (this.rawImages.building) {
+                this.sprites.building = this.createCanvasSlice(
+                    this.rawImages.building,
+                    389, 106, 433, 381
+                );
+            }
+
+            if (this.rawImages.joinUsBtn) {
+                this.sprites.joinUsBtn = this.createCanvasSlice(
+                    this.rawImages.joinUsBtn,
+                    48, 55, 1973, 640
+                );
+            }
+
+            // Venture Mushrooms
+            this.sprites.mushrooms = {
+                innovher: this.createCanvasSlice(this.rawImages.shroomInnovher, 404, 124, 383, 363),
+                innoveda: this.createCanvasSlice(this.rawImages.shroomInnoveda, 399, 113, 403, 369),
+                innovidea: this.createCanvasSlice(this.rawImages.shroomInnovidea, 400, 130, 395, 347),
+                bharat: this.createCanvasSlice(this.rawImages.shroomBharat, 400, 120, 393, 376),
+                code: this.createCanvasSlice(this.rawImages.shroomCode, 373, 110, 449, 375),
+                beyondAbility: this.createCanvasSlice(this.rawImages.shroomBeyondAbility, 236, 20, 1065, 980)
+            };
+
+            // Synthesized Coin Graphic
+            this.sprites.coinFrames = this.generateCoinFrames();
+        } catch (e) {
+            console.error('Sprite slicing error caught:', e);
         }
-
-        // Clay Brick Platform (Day & Night)
-        if (this.rawImages.brick) {
-            this.sprites.brick = this.createCanvasSlice(
-                this.rawImages.brick,
-                422, 209, 357, 182
-            );
-            // Night theme brick: dark crimson/purple stone texture
-            this.sprites.brickNight = this.createTintedCanvas(this.sprites.brick, '#4a0e2e', 'source-atop', 0.65);
-        }
-
-        // Pink Question Box
-        if (this.rawImages.qbox) {
-            this.sprites.qbox = this.createCanvasSlice(
-                this.rawImages.qbox,
-                418, 125, 365, 343
-            );
-            // Inactive/empty box (slightly darkened)
-            const emptyC = document.createElement('canvas');
-            emptyC.width = 365;
-            emptyC.height = 343;
-            const ectx = emptyC.getContext('2d');
-            ectx.drawImage(this.sprites.qbox, 0, 0);
-            ectx.fillStyle = 'rgba(70, 40, 60, 0.45)';
-            ectx.fillRect(0, 0, 365, 343);
-            this.sprites.qboxEmpty = emptyC;
-        }
-
-        // Pipes (Day & Night)
-        if (this.rawImages.pipes) {
-            const p = this.rawImages.pipes;
-            this.sprites.pipeTall = this.createCanvasSlice(p, 324, 150, 149, 304);
-            this.sprites.pipeMedium = this.createCanvasSlice(p, 497, 252, 145, 200);
-            this.sprites.pipeHorizontal = this.createCanvasSlice(p, 663, 291, 215, 163);
-
-            // Night theme pipes: dark grey metallic / night stone
-            this.sprites.pipeTallNight = this.createTintedCanvas(this.sprites.pipeTall, '#1e293b', 'color', 0.85);
-            this.sprites.pipeMediumNight = this.createTintedCanvas(this.sprites.pipeMedium, '#1e293b', 'color', 0.85);
-            this.sprites.pipeHorizontalNight = this.createTintedCanvas(this.sprites.pipeHorizontal, '#1e293b', 'color', 0.85);
-        }
-
-        // Trees
-        if (this.rawImages.trees) {
-            const t = this.rawImages.trees;
-            this.sprites.treeGreen = this.createCanvasSlice(t, 244, 60, 209, 241);
-            this.sprites.treePink = this.createCanvasSlice(t, 488, 58, 220, 240);
-            this.sprites.treePalm = this.createCanvasSlice(t, 715, 58, 245, 245);
-            this.sprites.treePine = this.createCanvasSlice(t, 383, 320, 172, 220);
-            this.sprites.treeOrange = this.createCanvasSlice(t, 656, 320, 166, 221);
-        }
-
-        // Ground Tile (Day & Night)
-        if (this.rawImages.floor) {
-            this.sprites.floor = this.createCanvasSlice(
-                this.rawImages.floor,
-                0, 478, 1200, 122
-            );
-            // Night theme ground: cool dark blue-purple tone
-            this.sprites.floorNight = this.createTintedCanvas(this.sprites.floor, '#1e1035', 'color', 0.7);
-        }
-
-        // Flagpole & Goal Building
-        if (this.rawImages.flagpole) {
-            this.sprites.flagpole = this.createCanvasSlice(
-                this.rawImages.flagpole,
-                91, 147, 449, 992
-            );
-        }
-
-        if (this.rawImages.building) {
-            this.sprites.building = this.createCanvasSlice(
-                this.rawImages.building,
-                389, 106, 433, 381
-            );
-        }
-
-        if (this.rawImages.joinUsBtn) {
-            this.sprites.joinUsBtn = this.createCanvasSlice(
-                this.rawImages.joinUsBtn,
-                48, 55, 1973, 640
-            );
-        }
-
-        // Venture Mushrooms
-        this.sprites.mushrooms = {
-            innovher: this.createCanvasSlice(this.rawImages.shroomInnovher, 404, 124, 383, 363),
-            innoveda: this.createCanvasSlice(this.rawImages.shroomInnoveda, 399, 113, 403, 369),
-            innovidea: this.createCanvasSlice(this.rawImages.shroomInnovidea, 400, 130, 395, 347),
-            bharat: this.createCanvasSlice(this.rawImages.shroomBharat, 400, 120, 393, 376),
-            code: this.createCanvasSlice(this.rawImages.shroomCode, 373, 110, 449, 375),
-            beyondAbility: this.createCanvasSlice(this.rawImages.shroomBeyondAbility, 236, 20, 1065, 980)
-        };
-
-        // Synthesized Coin Graphic
-        this.sprites.coinFrames = this.generateCoinFrames();
     }
 
     generateCoinFrames() {
