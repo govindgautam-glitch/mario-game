@@ -1,0 +1,327 @@
+/**
+ * Main Game Engine (60FPS Loop, Screen Shake, LocalStorage & Leaderboard Coordinator)
+ */
+class Game {
+    constructor() {
+        this.canvas = document.getElementById('game-canvas');
+        this.ctx = this.canvas.getContext('2d');
+
+        this.width = 960;
+        this.height = 540;
+        this.canvas.width = this.width;
+        this.canvas.height = this.height;
+
+        this.camera = { x: 0, y: 0 };
+        this.state = 'LOADING'; // LOADING, TITLE, PLAYING, MODAL, VICTORY, GAMEOVER, PAUSED
+
+        // Player Name & Score State
+        this.playerName = localStorage.getItem('studio_mario_player_name') || '';
+        this.highScore = parseInt(localStorage.getItem('studio_mario_high_score') || '0', 10);
+        this.isNewHighScore = false;
+
+        this.score = 0;
+        this.coins = 0;
+        this.lives = 3;
+        this.time = 300;
+        this.world = '1-1';
+
+        this.lastTime = 0;
+        this.isPaused = false;
+
+        // Screen Shake Engine
+        this.shakeTimer = 0;
+        this.shakeIntensity = 0;
+
+        this.player = new Player(80, 420);
+        this.level = new Level();
+
+        this.init();
+    }
+
+    async init() {
+        const loadingBar = document.getElementById('loading-bar-fill');
+        const loadingText = document.getElementById('loading-text');
+
+        await window.spriteManager.loadAll((progress) => {
+            if (loadingBar) loadingBar.style.width = `${Math.round(progress * 100)}%`;
+            if (loadingText) loadingText.innerText = `Loading Assets... ${Math.round(progress * 100)}%`;
+        });
+
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) loadingOverlay.classList.add('hidden');
+
+        this.state = 'TITLE';
+        window.uiManager.showStartScreen(this.playerName, this.getLeaderboard());
+
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+
+        requestAnimationFrame((t) => this.loop(t));
+    }
+
+    resize() {
+        const container = document.getElementById('canvas-container');
+        if (!container) return;
+        const containerW = container.clientWidth;
+        const containerH = container.clientHeight;
+
+        const scale = Math.min(containerW / this.width, containerH / this.height);
+        this.canvas.style.width = `${this.width * scale}px`;
+        this.canvas.style.height = `${this.height * scale}px`;
+    }
+
+    setPlayerName(name) {
+        this.playerName = name.trim().slice(0, 12);
+        localStorage.setItem('studio_mario_player_name', this.playerName);
+    }
+
+    getLeaderboard() {
+        try {
+            const raw = localStorage.getItem('studio_mario_leaderboard');
+            if (raw) return JSON.parse(raw);
+        } catch (e) {
+            console.warn('Leaderboard parse error:', e);
+        }
+        return [
+            { name: 'Studio_i', score: 12500 },
+            { name: 'Founder_1', score: 9800 },
+            { name: 'Innovator', score: 7400 },
+            { name: 'Speedrun', score: 5200 },
+            { name: 'Alpha', score: 3600 }
+        ];
+    }
+
+    saveScoreToLeaderboard(name, finalScore) {
+        let board = this.getLeaderboard();
+        board.push({ name: name || 'Player', score: finalScore });
+        board.sort((a, b) => b.score - a.score);
+        board = board.slice(0, 5); // Keep top 5
+        localStorage.setItem('studio_mario_leaderboard', JSON.stringify(board));
+
+        if (finalScore > this.highScore) {
+            this.highScore = finalScore;
+            this.isNewHighScore = true;
+            localStorage.setItem('studio_mario_high_score', String(this.highScore));
+        } else {
+            this.isNewHighScore = false;
+        }
+        return board;
+    }
+
+    triggerScreenShake(intensity = 6, duration = 0.2) {
+        this.shakeIntensity = intensity;
+        this.shakeTimer = duration;
+    }
+
+    start(enteredName) {
+        if (enteredName) this.setPlayerName(enteredName);
+        this.resetGame();
+        this.state = 'PLAYING';
+        window.uiManager.hideStartScreen();
+        if (window.soundManager) {
+            window.soundManager.init();
+            window.soundManager.startMusic('day');
+        }
+    }
+
+    restart() {
+        this.lives = 3;
+        this.score = 0;
+        this.coins = 0;
+        this.time = 300;
+        this.resetGame();
+        this.state = 'PLAYING';
+        window.uiManager.hideAllScreens();
+        if (window.soundManager) {
+            window.soundManager.startMusic('day');
+        }
+    }
+
+    returnToTitle() {
+        this.state = 'TITLE';
+        window.uiManager.showStartScreen(this.playerName, this.getLeaderboard());
+    }
+
+    resetGame() {
+        this.player.reset();
+        this.player.x = 80;
+        this.player.y = 420;
+        this.level.buildLevel();
+        window.particleManager.reset();
+        this.camera.x = 0;
+        this.camera.y = 0;
+        this.time = 300;
+        this.shakeTimer = 0;
+    }
+
+    addScore(pts) {
+        this.score += pts;
+    }
+
+    addCoin() {
+        this.coins++;
+        if (this.coins >= 100) {
+            this.coins = 0;
+            this.lives++;
+            if (window.particleManager) {
+                window.particleManager.addScoreText(this.player.x, this.player.y - 20, '1-UP!', '#22c55e');
+            }
+        }
+    }
+
+    spawnBlockContent(x, y, content) {
+        if (content === 'coin') {
+            this.addCoin();
+            this.addScore(200);
+            if (window.soundManager) window.soundManager.playCoin();
+            if (window.particleManager) {
+                window.particleManager.addScoreText(x, y - 20, '200');
+                window.particleManager.spawnSparkles(x, y - 10, 12, '#fbbf24');
+            }
+        } else {
+            const shroom = new MushroomPowerup(x - 23, y - 20, content);
+            this.level.mushrooms.push(shroom);
+        }
+    }
+
+    triggerVentureModal(ventureKey) {
+        this.state = 'MODAL';
+        window.uiManager.openVentureModal(ventureKey);
+    }
+
+    resumeFromModal() {
+        if (this.state === 'MODAL') {
+            this.state = 'PLAYING';
+        }
+    }
+
+    onFlagpoleReached() {
+        this.state = 'FLAGPOLE';
+    }
+
+    triggerVictory() {
+        if (this.state === 'VICTORY') return;
+        this.state = 'VICTORY';
+        const timeBonus = Math.max(0, Math.ceil(this.time)) * 50;
+        this.score += timeBonus;
+        const updatedLeaderboard = this.saveScoreToLeaderboard(this.playerName, this.score);
+        setTimeout(() => {
+            window.uiManager.showVictory(this.playerName, this.score, this.isNewHighScore, updatedLeaderboard);
+        }, 1500);
+    }
+
+    loop(timestamp) {
+        if (!this.lastTime) this.lastTime = timestamp;
+        let dt = (timestamp - this.lastTime) / 1000;
+        this.lastTime = timestamp;
+
+        if (dt > 0.1) dt = 0.1;
+
+        this.update(dt);
+        this.draw();
+
+        window.inputHandler.clearJustPressed();
+
+        requestAnimationFrame((t) => this.loop(t));
+    }
+
+    update(dt) {
+        if (window.inputHandler.isPauseJustPressed() && (this.state === 'PLAYING' || this.state === 'PAUSED')) {
+            this.isPaused = !this.isPaused;
+            this.state = this.isPaused ? 'PAUSED' : 'PLAYING';
+            window.uiManager.showPause(this.isPaused);
+        }
+
+        if (this.state === 'MODAL' && window.inputHandler.isActionJustPressed()) {
+            window.uiManager.closeModal();
+            return;
+        }
+
+        // Screen Shake Countdown
+        if (this.shakeTimer > 0) {
+            this.shakeTimer -= dt;
+            if (this.shakeTimer <= 0) {
+                this.shakeIntensity = 0;
+            }
+        }
+
+        if (this.state === 'PLAYING' || this.state === 'FLAGPOLE') {
+            this.time -= dt;
+            if (this.time <= 0 && !this.player.isDead) {
+                this.player.die();
+            }
+
+            this.player.update(dt, window.inputHandler, this.level);
+            this.level.update(dt, this.player);
+            window.particleManager.update(dt);
+
+            // Smooth Camera Easing with Lookahead
+            const lookahead = this.player.facing * 90;
+            const targetCamX = this.player.x - this.width * 0.35 + lookahead;
+            this.camera.x += (targetCamX - this.camera.x) * 5.5 * dt;
+
+            if (this.camera.x < 0) this.camera.x = 0;
+            if (this.camera.x > this.level.width - this.width) {
+                this.camera.x = this.level.width - this.width;
+            }
+
+            // Dynamic BGM Zone Tuning
+            const nightRatio = this.level.getNightBlendRatio(this.camera.x);
+            if (window.soundManager && window.soundManager.musicPlaying) {
+                window.soundManager.setZone(nightRatio > 0.5 ? 'night' : 'day');
+            }
+
+            // Death & Game Over Check
+            if (this.player.isDead && this.player.y > this.level.height + 250) {
+                this.lives--;
+                if (this.lives <= 0) {
+                    this.state = 'GAMEOVER';
+                    const updatedLeaderboard = this.saveScoreToLeaderboard(this.playerName, this.score);
+                    window.uiManager.showGameOver(this.playerName, this.score, this.isNewHighScore, updatedLeaderboard);
+                } else {
+                    this.resetGame();
+                }
+            }
+
+            // Update Live HUD
+            window.uiManager.updateHUD(this.playerName, this.score, this.coins, this.world, this.time, this.lives);
+        }
+    }
+
+    draw() {
+        this.ctx.clearRect(0, 0, this.width, this.height);
+
+        this.ctx.save();
+
+        // Apply Screen Shake Offset
+        if (this.shakeTimer > 0) {
+            const shakeX = (Math.random() - 0.5) * 2 * this.shakeIntensity;
+            const shakeY = (Math.random() - 0.5) * 2 * this.shakeIntensity;
+            this.ctx.translate(shakeX, shakeY);
+        }
+
+        if (this.state === 'TITLE') {
+            const bgDay = window.spriteManager.rawImages.bgDay;
+            if (bgDay && bgDay.complete) {
+                this.ctx.drawImage(bgDay, 0, 0, this.width, this.height);
+            }
+            this.ctx.restore();
+            return;
+        }
+
+        // Draw Level Elements
+        this.level.draw(this.ctx, this.camera);
+
+        // Draw Player
+        this.player.draw(this.ctx, this.camera);
+
+        // Draw Particles & Floating Text
+        window.particleManager.draw(this.ctx);
+
+        this.ctx.restore();
+    }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    window.gameInstance = new Game();
+});

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Studio i - Mario Adventure</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app-wrapper">
+        <div id="canvas-container">
+            <!-- Unified In-Game Arcade HUD -->
+            <div id="hud-overlay">
+                <div class="hud-group">
+                    <span class="hud-label">PLAYER</span>
+                    <span id="hud-player-name" class="hud-value">MARIO</span>
+                </div>
+                <div class="hud-group">
+                    <span class="hud-label">SCORE</span>
+                    <span id="hud-score" class="hud-value">000000</span>
+                </div>
+                <div class="hud-group">
+                    <span class="hud-label">COINS</span>
+                    <span id="hud-coins" class="hud-value">x00</span>
+                </div>
+                <div class="hud-group">
+                    <span class="hud-label">WORLD</span>
+                    <span id="hud-world" class="hud-value">1-1</span>
+                </div>
+                <div class="hud-group">
+                    <span class="hud-label">TIME</span>
+                    <span id="hud-time" class="hud-value">300</span>
+                </div>
+                <div class="hud-group">
+                    <span class="hud-label">LIVES</span>
+                    <span id="hud-lives" class="hud-value">x3</span>
+                </div>
+                <button id="btn-toggle-audio">🔊 Audio</button>
+            </div>
+
+            <!-- Game Canvas -->
+            <canvas id="game-canvas"></canvas>
+
+            <!-- Loading Screen -->
+            <div id="loading-overlay" class="overlay-screen">
+                <h1 class="game-title">STUDIO I</h1>
+                <p id="loading-text" class="game-subtitle">Loading Game Assets...</p>
+                <div class="loading-bar">
+                    <div id="loading-bar-fill"></div>
+                </div>
+            </div>
+
+            <!-- Start Screen with Name Entry & Local Leaderboard -->
+            <div id="start-screen" class="overlay-screen hidden">
+                <div class="card-menu">
+                    <h1 class="game-title">STUDIO I</h1>
+                    <p class="game-subtitle">The Venture Platformer Adventure</p>
+
+                    <!-- Name Entry Box -->
+                    <div class="name-entry-box">
+                        <label for="player-name-input" class="name-label">ENTER YOUR NAME TO START:</label>
+                        <input type="text" id="player-name-input" maxlength="12" placeholder="Your Name" autocomplete="off" spellcheck="false">
+                    </div>
+
+                    <!-- Top 5 Leaderboard -->
+                    <div class="leaderboard-section">
+                        <div class="leaderboard-title">🏆 TOP FOUNDERS LEADERBOARD</div>
+                        <ul id="start-leaderboard-list" class="leaderboard-list"></ul>
+                    </div>
+
+                    <div class="controls-hint">
+                        <strong>Controls:</strong> [A][D] / [Arrows] Move &bull; [Space]/[W] Jump (hold for high arc) &bull; [Shift] Sprint
+                    </div>
+
+                    <button id="btn-start-game" class="retro-btn" disabled>START GAME [SPACE]</button>
+                </div>
+            </div>
+
+            <!-- Pause Screen -->
+            <div id="pause-screen" class="overlay-screen hidden">
+                <div class="card-menu">
+                    <h1 class="game-title">PAUSED</h1>
+                    <p class="game-subtitle">Press [P] or [Escape] to resume</p>
+                </div>
+            </div>
+
+            <!-- Personalized Game Over Screen -->
+            <div id="game-over-screen" class="overlay-screen hidden">
+                <div class="card-menu">
+                    <h1 class="game-title" style="color: #ef4444;">GAME OVER</h1>
+                    <h2 id="gameover-personalized-title" style="font-size: 15px; color: #f472b6; margin-bottom: 8px;">NICE RUN!</h2>
+                    
+                    <div id="gameover-high-score-badge" class="high-score-badge hidden">🏆 NEW HIGH SCORE!</div>
+
+                    <p style="font-family: var(--arcade-font); font-size: 11px; margin-bottom: 14px;">
+                        FINAL SCORE: <span id="gameover-final-score" style="color: #facc15;">0</span>
+                    </p>
+
+                    <div class="leaderboard-section">
+                        <div class="leaderboard-title">🏆 TOP FOUNDERS</div>
+                        <ul id="gameover-leaderboard-list" class="leaderboard-list"></ul>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="btn-restart-game" class="retro-btn">PLAY AGAIN [SPACE]</button>
+                        <button id="btn-gameover-title" class="retro-btn btn-secondary">CHANGE PLAYER</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Venture Lore Modal (Spotlight Card from Reference Video) -->
+            <div id="venture-modal" class="overlay-screen hidden">
+                <div class="modal-card">
+                    <div class="modal-mushroom-container">
+                        <img id="modal-mushroom-img" src="" alt="Venture Mushroom">
+                    </div>
+                    <div class="modal-body">
+                        <h2 id="modal-venture-title">VENTURE TITLE</h2>
+                        <p id="modal-venture-text">Narrative text appears here with typewriter effect...</p>
+                        <div class="modal-footer">
+                            <button id="modal-close-btn" class="retro-btn">CONTINUE [SPACE]</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Personalized Victory Screen -->
+            <div id="victory-screen" class="overlay-screen hidden">
+                <div class="card-menu">
+                    <h1 class="game-title" style="color: #4ade80;">LEVEL CLEAR!</h1>
+                    <h2 id="victory-player-message" style="font-size: 14px; font-weight: 800; color: #f472b6; margin-bottom: 4px;">CONGRATULATIONS!</h2>
+                    
+                    <div id="victory-high-score-badge" class="high-score-badge hidden">🏆 NEW PERSONAL BEST!</div>
+
+                    <p class="game-subtitle" style="font-size: 13px; font-weight: 800; color: #fbcfe8; margin-bottom: 6px;">
+                        THE GATES ARE OPEN. THE RUNWAY IS READY.
+                    </p>
+                    <p style="font-size: 11px; line-height: 1.5; color: #cbd5e1; margin-bottom: 12px;">
+                        Studio i is where ideas stop waiting and start building. Step in. The runway's clear for takeoff.
+                    </p>
+
+                    <div class="join-us-container">
+                        <img id="btn-join-us" class="join-us-img" src="mario game iamges/ChatGPT Image Aug 27, 2026, 06_13_21 AM.png" alt="Join Us Button">
+                    </div>
+
+                    <p style="font-family: var(--arcade-font); font-size: 11px; margin-bottom: 12px;">
+                        FINAL SCORE: <span id="victory-final-score" style="color: #facc15;">0</span>
+                    </p>
+
+                    <div class="leaderboard-section">
+                        <div class="leaderboard-title">🏆 TOP FOUNDERS</div>
+                        <ul id="victory-leaderboard-list" class="leaderboard-list"></ul>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="btn-victory-restart" class="retro-btn">PLAY AGAIN</button>
+                        <button id="btn-victory-title" class="retro-btn btn-secondary">CHANGE PLAYER</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Virtual Touch Controls for Mobile / Responsive -->
+            <div id="touch-controls">
+                <div class="touch-dpad">
+                    <button id="btn-left" class="touch-btn">◀</button>
+                    <button id="btn-right" class="touch-btn">▶</button>
+                </div>
+                <div class="touch-actions">
+                    <button id="btn-sprint" class="touch-btn">🏃</button>
+                    <button id="btn-jump" class="touch-btn btn-jump-action">▲</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/audio.js"></script>
+    <script src="js/sprites.js"></script>
+    <script src="js/particle.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/enemy.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/level.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>
