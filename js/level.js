@@ -1,7 +1,7 @@
 /**
  * Level and Tilemap Engine
  * Features smooth Day-to-Night background & palette crossfading, classic mushroom physics,
- * parallax scenery, blocks, pipes, coins, venture mushrooms, and goal elements.
+ * parallax scenery, interactive transition pipes, blocks, coins, and goal elements.
  */
 
 class Block {
@@ -92,10 +92,13 @@ class Block {
 }
 
 class PipeSolid {
-    constructor(x, y, type = 'medium', themeTarget = null) {
+    constructor(x, y, type = 'medium', themeTarget = null, targetX = null, targetY = null) {
         this.x = x;
         this.type = type;
         this.themeTarget = themeTarget; // 'night' or 'day'
+        this.isTransitionPipe = !!themeTarget;
+        this.targetX = targetX;
+        this.targetY = targetY;
         this.margin = 0;
 
         if (type === 'tall') {
@@ -365,10 +368,25 @@ class Level {
         this.enemies = [];
         this.trees = [];
 
+        // Active Theme State Manager (Day ↔ Night Crossfade Engine)
+        this.currentTheme = 'day';
+        this.themeBlend = 0; // 0 = 100% Day, 1 = 100% Night
+        this.themeTargetBlend = 0;
+        this.themeTransitionDuration = 0.35; // 350ms smooth crossfade
+
         this.flagpole = { x: 4400, y: 110, w: 46, h: 340 };
         this.building = { x: 4620, y: 160, w: 320, h: 290 };
 
         this.buildLevel();
+    }
+
+    setTheme(themeName, duration = 0.35) {
+        this.currentTheme = themeName;
+        this.themeTargetBlend = (themeName === 'night') ? 1 : 0;
+        this.themeTransitionDuration = duration || 0.35;
+        if (window.soundManager && window.soundManager.musicPlaying) {
+            window.soundManager.setZone(themeName);
+        }
     }
 
     buildLevel() {
@@ -379,6 +397,9 @@ class Level {
         this.mushrooms = [];
         this.enemies = [];
         this.trees = [];
+        this.currentTheme = 'day';
+        this.themeBlend = 0;
+        this.themeTargetBlend = 0;
 
         // Ground Segments
         const groundSegments = [
@@ -433,7 +454,7 @@ class Level {
         this.addEnemy(1300, this.groundY - 60, 80);
 
         // Zone 2: Deep Night / Underworld (1600px - 3200px) - Transition Pipe into Night
-        this.addPipe(1520, this.groundY, 'tall', 'night');
+        this.addPipe(1520, this.groundY, 'tall', 'night', 1780, 380);
         this.addEnemy(1680, this.groundY - 60, 100);
 
         this.addBlock(1780, 320, 48, 48, 'brick');
@@ -468,7 +489,7 @@ class Level {
         this.addEnemy(3020, this.groundY - 60, 120);
 
         // Zone 3: Finale Ascent & Studio i HQ (3200px - 5200px) - Return Pipe to Day
-        this.addPipe(3280, this.groundY, 'short', 'day');
+        this.addPipe(3280, this.groundY, 'short', 'day', 3480, 380);
         this.addBlock(3420, 280, 48, 48, 'qbox', 'beyondAbility');
         this.addBlock(3468, 280, 48, 48, 'brick');
 
@@ -490,8 +511,8 @@ class Level {
         this.solids.push(b);
     }
 
-    addPipe(x, y, type, themeTarget = null) {
-        const p = new PipeSolid(x, y, type, themeTarget);
+    addPipe(x, y, type, themeTarget = null, targetX = null, targetY = null) {
+        const p = new PipeSolid(x, y, type, themeTarget, targetX, targetY);
         this.pipes.push(p);
         this.solids.push(p);
     }
@@ -524,25 +545,26 @@ class Level {
         });
     }
 
-    // Calculates night blend ratio (0 = 100% Day, 1 = 100% Night) with smooth hermite curve
-    getNightBlendRatio(cameraX) {
-        // Transition Day -> Night between 1350px and 1750px
-        if (cameraX < 1350) return 0;
-        if (cameraX >= 1350 && cameraX <= 1750) {
-            const t = (cameraX - 1350) / 400;
-            return t * t * (3 - 2 * t);
-        }
-        // Deep Night between 1750px and 3050px
-        if (cameraX > 1750 && cameraX < 3050) return 1;
-        // Transition Night -> Day between 3050px and 3450px
-        if (cameraX >= 3050 && cameraX <= 3450) {
-            const t = 1 - (cameraX - 3050) / 400;
-            return t * t * (3 - 2 * t);
-        }
-        return 0;
-    }
-
     update(dt, player) {
+        // Update Smooth Theme Crossfade Easing (350ms)
+        if (this.themeBlend !== this.themeTargetBlend) {
+            const step = dt / (this.themeTransitionDuration || 0.35);
+            if (this.themeBlend < this.themeTargetBlend) {
+                this.themeBlend = Math.min(this.themeTargetBlend, this.themeBlend + step);
+            } else {
+                this.themeBlend = Math.max(this.themeTargetBlend, this.themeBlend - step);
+            }
+        }
+
+        // Automatic fallback detection when traversing between zones
+        if (player && !player.isDead) {
+            if (player.x >= 1520 && player.x < 3260 && this.currentTheme !== 'night') {
+                this.setTheme('night', 0.35);
+            } else if (player.x >= 3260 && this.currentTheme !== 'day') {
+                this.setTheme('day', 0.35);
+            }
+        }
+
         this.blocks.forEach(b => b.update(dt));
         this.coins.forEach(c => c.update(dt, player));
         this.mushrooms.forEach(m => m.update(dt, this, player));
@@ -576,7 +598,7 @@ class Level {
     }
 
     draw(ctx, camera) {
-        const nightRatio = this.getNightBlendRatio(camera.x);
+        const nightRatio = this.themeBlend;
 
         // 1. Smooth Parallax Background with Crossfading
         this.drawBackground(ctx, camera, nightRatio);

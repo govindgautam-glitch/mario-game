@@ -346,20 +346,23 @@ body {
     align-items: center;
 }
 
-/* Venture Modal Card */
+/* Venture Modal Card (Bug A & Bug B Fixes) */
 #venture-modal .modal-card {
     position: relative;
-    width: 86%;
-    max-width: 780px;
-    background: rgba(20, 15, 30, 0.94);
-    border: 3px dashed rgba(255, 255, 255, 0.85);
-    border-radius: 24px;
-    padding: 32px;
+    width: 90%;
+    max-width: 760px;
+    max-height: 85vh;
+    background: rgba(18, 12, 28, 0.96);
+    border: 3px dashed rgba(255, 255, 255, 0.9);
+    border-radius: 20px;
+    padding: 24px 28px;
     display: flex;
-    gap: 28px;
-    align-items: center;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9), 0 0 30px rgba(236, 72, 153, 0.35);
-    animation: modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    flex-direction: row;
+    align-items: stretch;
+    gap: 24px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9), 0 0 30px rgba(236, 72, 153, 0.4);
+    animation: modalPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-sizing: border-box;
 }
 
 @keyframes modalPop {
@@ -369,17 +372,16 @@ body {
 
 .modal-mushroom-container {
     flex-shrink: 0;
-    width: 140px;
-    height: 140px;
+    width: 120px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: radial-gradient(circle, rgba(236, 72, 153, 0.2) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(236, 72, 153, 0.25) 0%, transparent 70%);
 }
 
 #modal-mushroom-img {
     max-width: 100%;
-    max-height: 100%;
+    max-height: 120px;
     object-fit: contain;
     filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5));
     animation: floatShroom 2s ease-in-out infinite;
@@ -392,32 +394,60 @@ body {
 
 .modal-body {
     flex-grow: 1;
+    min-width: 0; /* Critical: prevents flex blowout on long strings */
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    justify-content: space-between;
+    gap: 10px;
 }
 
 #modal-venture-title {
     font-family: var(--arcade-font);
-    font-size: 16px;
+    font-size: 14px;
     color: #f43f5e;
     text-shadow: 0 0 10px rgba(244, 63, 94, 0.5);
     letter-spacing: 1px;
+    flex-shrink: 0;
 }
 
 #modal-venture-text {
     font-family: var(--arcade-font);
-    font-size: 10px;
-    line-height: 1.8;
+    font-size: 9px;
+    line-height: 1.85;
     color: #f1f5f9;
     letter-spacing: 0.5px;
-    min-height: 90px;
+    white-space: pre-wrap; /* Preserves normal spaces and word boundaries */
+    word-break: break-word; /* Wraps cleanly at word boundaries */
+    overflow-wrap: break-word;
+    max-height: 180px;
+    overflow-y: auto;
+    padding-right: 6px;
+    box-sizing: border-box;
+    flex-grow: 1;
+}
+
+/* Custom Scrollbar for Modal Text */
+#modal-venture-text::-webkit-scrollbar {
+    width: 6px;
+}
+#modal-venture-text::-webkit-scrollbar-thumb {
+    background: rgba(236, 72, 153, 0.5);
+    border-radius: 3px;
+}
+#modal-venture-text::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
 }
 
 .modal-footer {
     display: flex;
     justify-content: flex-end;
+    align-items: center;
     margin-top: 8px;
+    flex-shrink: 0;
+}
+
+#modal-close-btn {
+    white-space: nowrap;
 }
 
 /* Victory CTA */

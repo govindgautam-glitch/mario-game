@@ -48,6 +48,11 @@ class Player {
         this.invulnerableTimer = 0;
         this.isSlidingFlag = false;
         this.isEnteringBuilding = false;
+        this.isPipeTransitioning = false;
+        this.pipeTimer = 0;
+        this.pipeTargetTheme = null;
+        this.pipeTargetX = null;
+        this.pipeTargetY = null;
 
         // Jump Timers
         this.coyoteTimer = 0;
@@ -70,6 +75,11 @@ class Player {
             return;
         }
 
+        if (this.isPipeTransitioning) {
+            this.updatePipeTransition(dt, level);
+            return;
+        }
+
         if (this.isSlidingFlag) {
             this.updateFlagpole(dt, level);
             return;
@@ -79,6 +89,9 @@ class Player {
             this.updateEnterBuilding(dt);
             return;
         }
+
+        // Check for down-crouch pipe transition interaction
+        this.checkPipeInteraction(input, level);
 
         // Recover Squash & Stretch toward 1.0 via smooth spring lerp
         this.scaleX += (this.targetScaleX - this.scaleX) * this.springSpeed * dt;
@@ -330,6 +343,65 @@ class Player {
                 this.x - 100 + Math.random() * 260,
                 this.y - 120 - Math.random() * 160
             );
+        }
+    }
+
+    checkPipeInteraction(input, level) {
+        if (this.isPipeTransitioning || this.isDead || this.isSlidingFlag || this.isEnteringBuilding) return;
+        if (!level || !level.pipes) return;
+
+        const isCrouch = input.isCrouch();
+
+        for (const pipe of level.pipes) {
+            if (pipe.isTransitionPipe && pipe.themeTarget) {
+                // Check if Mario is standing on the pipe rim
+                const onPipeTop = (
+                    this.onGround &&
+                    this.x >= pipe.x + 8 &&
+                    this.x <= pipe.x + pipe.w - 8 &&
+                    Math.abs((this.y + this.height) - pipe.y) < 14
+                );
+
+                if (onPipeTop && isCrouch) {
+                    this.enterPipe(pipe, level);
+                    break;
+                }
+            }
+        }
+    }
+
+    enterPipe(pipe, level) {
+        this.isPipeTransitioning = true;
+        this.pipeTimer = 0.35;
+        this.pipeTargetTheme = pipe.themeTarget;
+        this.pipeTargetX = pipe.targetX;
+        this.pipeTargetY = pipe.targetY;
+        this.vx = 0;
+        this.vy = 0;
+
+        if (window.soundManager) {
+            window.soundManager.playPipe();
+        }
+
+        if (level && level.setTheme) {
+            level.setTheme(pipe.themeTarget, 0.35);
+        }
+    }
+
+    updatePipeTransition(dt, level) {
+        this.pipeTimer -= dt;
+        this.y += 35 * dt; // Smooth downward slide
+        this.updateAnimation(dt);
+
+        if (this.pipeTimer <= 0) {
+            this.isPipeTransitioning = false;
+            if (this.pipeTargetX !== undefined && this.pipeTargetX !== null) {
+                this.x = this.pipeTargetX;
+                this.y = this.pipeTargetY;
+            }
+            this.vx = 0;
+            this.vy = 0;
+            this.triggerSquash(0.85, 1.25);
         }
     }
 

@@ -1,6 +1,6 @@
 # Studio i Mario Game — Complete Project Overview & Architecture Graphs
 
-A visual architectural map and summary of all systems, assets, state machines, and components implemented so far.
+A comprehensive visual architectural map and summary of all systems, assets, state machines, and components implemented.
 
 ---
 
@@ -10,29 +10,29 @@ A visual architectural map and summary of all systems, assets, state machines, a
 graph TD
     subgraph "Core Engine (HTML5 Canvas + Vanilla JS)"
         Index["index.html<br/>(DOM & Canvas Viewport)"]
-        CSS["style.css<br/>(Arcade Theme & Modals)"]
+        CSS["style.css<br/>(Arcade Theme, Anchored HUD & Modals)"]
         Game["game.js<br/>(60FPS Loop & State Coordinator)"]
     end
 
     subgraph "Hardware & Input Layer"
         Input["input.js<br/>(Keyboard + Virtual Touch D-Pad)"]
-        Audio["audio.js<br/>(Web Audio API 8-Bit Synth)"]
+        Audio["audio.js<br/>(Web Audio API 8-Bit Synth + Pipe SFX)"]
     end
 
     subgraph "Asset & Graphics Pipeline"
         Assets[("Raw Asset Images & Video")]
-        Sprites["sprites.js<br/>(Slicing & Offscreen Canvas Cache)"]
+        Sprites["sprites.js<br/>(Slicing & Offscreen Day/Night Canvas Cache)"]
         Particles["particle.js<br/>(Debris, Sparkles, Fireworks, Score)"]
     end
 
     subgraph "Gameplay & Physics Entities"
-        Player["player.js<br/>(Studio i Mario - Physics & States)"]
-        Enemy["enemy.js<br/>(Distraction Patrol & Stomp AI)"]
-        Level["level.js<br/>(3-Zone Tilemap, Solids, Pipes, Blocks)"]
+        Player["player.js<br/>(Studio i Mario - Physics, Stomp & Pipe Transitions)"]
+        Enemy["enemy.js<br/>(Distraction Patrol & Velocity-Aware Stomp AI)"]
+        Level["level.js<br/>(3-Zone Tilemap, Transition Pipes, Day/Night Theme Engine)"]
     end
 
     subgraph "UI & Story Layer"
-        UI["ui.js<br/>(HUD, Typewriter Lore Modals, Screens)"]
+        UI["ui.js<br/>(HUD, Space-Preserving Typewriter Lore Modals, Screens)"]
     end
 
     %% Connections
@@ -72,110 +72,96 @@ stateDiagram-v2
     [*] --> LOADING : Page Load
 
     LOADING --> TITLE : Assets Sliced & Cached
-    TITLE --> PLAYING : Press Start / Space / Click
+    TITLE --> PLAYING : Press Start / Space / Click (Name Validated)
 
     state PLAYING {
-        [*] --> Overworld_Day : Zone 1 (0 - 1500px)
-        Overworld_Day --> Underground_Night : Zone 2 (1500 - 3100px)
-        Underground_Night --> Sunset_Finale : Zone 3 (3100 - 5200px)
+        [*] --> Overworld_Day : Zone 1 (0 - 1520px)
+        Overworld_Day --> Pipe_Transition_Night : Down on Tall Pipe / Enter Zone 2
+        Pipe_Transition_Night --> Deep_Night_Underground : 350ms Palette Crossfade
+        Deep_Night_Underground --> Pipe_Transition_Day : Down on Short Pipe / Enter Zone 3
+        Pipe_Transition_Day --> Sunset_Studio_i_Finale : 350ms Palette Crossfade
     }
 
-    PLAYING --> MODAL_PAUSED : Hit '?' Block (Venture Mushroom Emerges)
-    MODAL_PAUSED --> PLAYING : Press Space / Click Continue
+    PLAYING --> MODAL_PAUSED : Hit '?' Block (Venture Mushroom Emerges & Walks Right)
+    MODAL_PAUSED --> PLAYING : Press Space / Click Continue (Input Cleared, No Jump)
 
     PLAYING --> PAUSED : Press [P] or [Escape]
     PAUSED --> PLAYING : Press [P] or [Escape]
 
     PLAYING --> FLAGPOLE : Reach Studio i Flagpole
     FLAGPOLE --> VICTORY_WALK : Slide Down Pole
-    VICTORY_WALK --> VICTORY_SCREEN : Enter Studio i Building (Fireworks)
+    VICTORY_WALK --> VICTORY_SCREEN : Enter Studio i Building (Join Us Button + Results)
 
     PLAYING --> DEATH_KNOCKBACK : Hit by Distraction / Fall in Pit
-    DEATH_KNOCKBACK --> PLAYING : Lives > 0 (Respawn)
+    DEATH_KNOCKBACK --> PLAYING : Lives > 0 (Respawn with BGM Restart)
     DEATH_KNOCKBACK --> GAMEOVER : Lives == 0
 
-    GAMEOVER --> PLAYING : Restart Game
+    GAMEOVER --> PLAYING : Restart Game [Space]
     VICTORY_SCREEN --> PLAYING : Play Again
 ```
 
 ---
 
-## 3. Player Physics & Animation State Flow
+## 3. Interactive Day ↔ Night Pipe Theme Transition Flow
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Idle
+sequenceDiagram
+    autonumber
+    actor Player as Mario
+    participant Pipe as Transition Pipe
+    participant Level as Level Theme Engine
+    participant Audio as SoundManager
+    participant Renderer as Canvas Renderer
 
-    state "On Ground" as Grounded {
-        Idle --> Running : [A] / [D] / Move
-        Running --> Idle : No Input (Friction Decel)
-        Running --> Skidding : Sudden Direction Flip
-        Skidding --> Running : Turnaround Complete
-    }
-
-    Grounded --> Jumping : [Space] / [W] / [Up] (Jump Force)
-    Grounded --> Falling : Walk off Ledge (Coyote Time Window: 0.12s)
-
-    state "In Air" as Airborne {
-        Jumping --> Falling : Reached Apex / Release Jump Key
-        Falling --> Landing : Collide Surface from Top
-    }
-
-    Landing --> Idle : Land on Solid Ground
-
-    Grounded --> SlidingFlag : Grab Flagpole (19.png)
-    Airborne --> SlidingFlag : Grab Flagpole (19.png)
-    SlidingFlag --> AutoWalk : Reach Base of Pole
-    AutoWalk --> EnteredBuilding : Enter Studio i HQ
-
-    Grounded --> Hurt : Touch Enemy Side / Pit
-    Airborne --> StompEnemy : Fall on Enemy Head (Bounce Boost)
-    StompEnemy --> Falling
+    Player->>Pipe: Stand on pipe top & press [Down / S]
+    Player->>Audio: playPipe() retro SFX sweep
+    Player->>Level: setTheme('night', 0.35)
+    Level->>Audio: setZone('night') [BGM switch]
+    loop 350ms Smooth Crossfade Easing
+        Level->>Renderer: Update themeBlend (0.0 -> 1.0)
+        Renderer->>Renderer: Alpha blend Sky, BrickNight, PipeNight, FloorNight
+    end
+    Player->>Player: Slide out at underground entrance (targetX, targetY)
 ```
 
 ---
 
-## 4. Venture Mushroom Lore & Startup Progression Map
+## 4. Brand Lore Card Word-Wrap & Spacing Architecture
 
 ```mermaid
-flowchart LR
-    Start([Mario Start]) --> Z1[Zone 1: Overworld Day]
-    
-    subgraph "Day Overworld (Tutorial & First Ventures)"
-        Z1 --> V1["🍄 INNOVHER<br/>Venture Studio for Early-Stage Founders"]
-        V1 --> V2["🍄 INNOVEDA AI<br/>End-to-End Custom AI Infra"]
+graph LR
+    subgraph "Data & Typewriter Engine"
+        Data["VENTURE_DATA<br/>(Full raw copy with spaces)"]
+        Slice["uiManager.openVentureModal()<br/>(textContent = slice(0, idx))"]
     end
 
-    Z1 --> Z2[Zone 2: Deep Night / Underworld]
-
-    subgraph "Night Underworld (Advanced Platforming)"
-        Z2 --> V3["🍄 INNOVIDEA<br/>Integrated Marketing & Digital Growth"]
-        Z2 --> V4["🍄 BHARAT VENTURES<br/>India-First Policy & Innovation Ecosystem"]
-        Z2 --> V5["🍄 ENCODE<br/>AI Phygital Learning Network"]
+    subgraph "CSS Flexbox Hierarchy"
+        Card[".modal-card<br/>(90% width, dashed border, flex-row)"]
+        Icon[".modal-mushroom-container<br/>(Fixed width 120px)"]
+        Body[".modal-body<br/>(min-width: 0, flex-column, justify-between)"]
+        Text["#modal-venture-text<br/>(white-space: pre-wrap, word-break: break-word, max-height: 180px, scrollable)"]
+        Footer[".modal-footer<br/>(Anchored at bottom right)"]
+        Btn["#modal-close-btn<br/>(CONTINUE [SPACE])"]
     end
 
-    Z2 --> Z3[Zone 3: Sunset Finale]
-
-    subgraph "Finale & Goal"
-        Z3 --> V6["🍄 BEYOND ABILITY X<br/>Professional Ecosystem for Athletes"]
-        V6 --> Flag["🚩 Studio i Flagpole<br/>(19.png)"]
-        Flag --> HQ["🏢 Studio i Headquarters<br/>(Mario Studio i Final Building.png)"]
-        HQ --> Victory["🏆 Victory Modal<br/>'JOIN US' Button"]
-    end
+    Data --> Slice
+    Slice --> Text
+    Card --> Icon
+    Card --> Body
+    Body --> Text
+    Body --> Footer
+    Footer --> Btn
 ```
 
 ---
 
-## 5. Completed Work Matrix
+## 5. Collision & Physics Safety Matrix
 
-| Component | Status | Summary |
-| :--- | :---: | :--- |
-| **Asset Analysis** | ✅ | Extracted dimensions, bounding boxes, alpha masks for all 21 files. |
-| **Sprites Engine** | ✅ | Precise sprite-slicing for Mario, Distraction, bricks, question box, pipes, trees, mushrooms, flagpole, building. |
-| **Player Controller** | ✅ | Variable-arc jump, coyote time, jump buffer, run cycles, skidding, hurt/death states. |
-| **Enemy AI** | ✅ | Distraction Goomba with obstacle bounce patrol and stomp-squash interaction. |
-| **Level Architecture** | ✅ | 5200px 3-zone connected map (Day → Night → Sunset) with parallax layers and pits. |
-| **Interactive Modals** | ✅ | Dashed retro spotlight cards with animated mushrooms & typewriter narrative text. |
-| **Audio Engine** | ✅ | 8-bit chiptune sound generator using Web Audio API for Day/Night BGM and SFX. |
-| **Arcade HUD & UI** | ✅ | Retro score, coins counter, world tracker, timer, lives indicator, touch controls. |
-| **Endgame Sequence** | ✅ | Flagpole slide down, studio entrance, fireworks celebration, and Join Us CTA button. |
+| Collision Case | Root Cause / Risk | Implemented Production Fix |
+| :--- | :--- | :--- |
+| **Ground Horizontal Snapping** | Sub-pixel vertical dip treated ground tile as vertical wall. | Excluded `solid.type === 'ground'` from horizontal collision & added penetration threshold (`bounds.y + bounds.h > solid.y + 8`). |
+| **Fast Fall Stomp Race** | High vertical speed overshoots static 24px stomp threshold. | Velocity-aware dynamic window: `enemyTop + Math.max(28, player.vy * dt)`. |
+| **Mushroom Power-up Physics** | Previously static / bobbing in place. | Emerges vertically, walks continuously right at `vx = 90`, bounces on walls/pipes, falls with gravity. |
+| **Modal Space Bleed** | Dismissing modal buffered Space causing instant jump. | `inputHandler.clearJustPressed()` & `player.jumpBufferTimer = 0` called inside `closeModal()`. |
+| **HUD Letterboxing** | Ultrawide viewport caused HUD to float in black letterbox borders. | HUD `#hud-overlay` anchored dynamically to canvas bounding box during `resize()`. |
+| **Audio Toggle Mute** | Uninitialized AudioContext crashed or muted silently. | `soundManager.init()` called before `toggleMute()`. |

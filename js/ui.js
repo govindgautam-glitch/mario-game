@@ -295,25 +295,33 @@ class UIManager {
         }
 
         if (this.modalText) {
-            this.modalText.innerText = '';
+            this.modalText.textContent = '';
             if (this.typewriterInterval) clearInterval(this.typewriterInterval);
 
             let charIdx = 0;
             const fullText = data.text;
+            this.currentModalFullText = fullText;
+
+            // Bug A Fix: Use textContent slicing instead of innerText concatenation to preserve word boundaries and whitespace
             this.typewriterInterval = setInterval(() => {
                 if (charIdx < fullText.length) {
-                    this.modalText.innerText += fullText[charIdx];
-                    charIdx++;
+                    charIdx += 2;
+                    this.modalText.textContent = fullText.slice(0, Math.min(fullText.length, charIdx));
                 } else {
+                    this.modalText.textContent = fullText;
                     clearInterval(this.typewriterInterval);
+                    this.typewriterInterval = null;
                 }
-            }, 10);
+            }, 12);
         }
     }
 
     closeModal() {
         this.isModalOpen = false;
-        if (this.typewriterInterval) clearInterval(this.typewriterInterval);
+        if (this.typewriterInterval) {
+            clearInterval(this.typewriterInterval);
+            this.typewriterInterval = null;
+        }
         if (this.modalEl) this.modalEl.classList.add('hidden');
         
         // Fix #6: Clear justPressed and jump buffer so modal dismissal with Space doesn't trigger a jump
