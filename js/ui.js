@@ -44,6 +44,11 @@ const VENTURE_DATA = {
 
 class UIManager {
     constructor() {
+        this.initElements();
+        this.initEvents();
+    }
+
+    initElements() {
         // In-game HUD
         this.playerNameEl = document.getElementById('hud-player-name');
         this.scoreEl = document.getElementById('hud-score');
@@ -72,11 +77,10 @@ class UIManager {
 
         this.isModalOpen = false;
         this.typewriterInterval = null;
-
-        this.initEvents();
     }
 
     initEvents() {
+        if (!this.nameInput) this.initElements();
         // Name Input validation
         if (this.nameInput) {
             this.nameInput.addEventListener('input', () => {

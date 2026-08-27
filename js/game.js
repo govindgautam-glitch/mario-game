@@ -63,22 +63,33 @@ class Game {
     resize() {
         const container = document.getElementById('canvas-container');
         const hud = document.getElementById('hud-overlay');
-        if (!container) return;
-        const containerW = container.clientWidth;
-        const containerH = container.clientHeight;
 
-        const scale = Math.min(containerW / this.width, containerH / this.height);
-        const actualW = this.width * scale;
-        const actualH = this.height * scale;
+        let containerW = container ? container.clientWidth : 0;
+        let containerH = container ? container.clientHeight : 0;
+
+        if (containerW <= 10 || containerH <= 10) {
+            containerW = window.innerWidth || 960;
+            containerH = window.innerHeight || 540;
+        }
+
+        const maxW = Math.min(1280, containerW);
+        const maxH = Math.min(720, containerH);
+
+        const scale = Math.min(maxW / this.width, maxH / this.height);
+        const validScale = (scale && scale > 0.1) ? scale : 1;
+        const actualW = Math.round(this.width * validScale);
+        const actualH = Math.round(this.height * validScale);
 
         this.canvas.style.width = `${actualW}px`;
         this.canvas.style.height = `${actualH}px`;
 
-        // Fix #9: Anchor HUD overlay directly to rendered canvas bounding box on non-16:9 viewports
+        // Anchor HUD overlay directly to rendered canvas bounding box
         if (hud) {
             hud.style.width = `${actualW}px`;
-            hud.style.left = `${(containerW - actualW) / 2}px`;
-            hud.style.top = `${(containerH - actualH) / 2}px`;
+            const leftOffset = Math.max(0, (containerW - actualW) / 2);
+            const topOffset = Math.max(0, (containerH - actualH) / 2);
+            hud.style.left = `${leftOffset}px`;
+            hud.style.top = `${topOffset}px`;
         }
     }
 
@@ -354,6 +365,14 @@ class Game {
     }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-    window.gameInstance = new Game();
-});
+function bootGame() {
+    if (!window.gameInstance) {
+        window.gameInstance = new Game();
+    }
+}
+
+if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', bootGame);
+} else {
+    bootGame();
+}
