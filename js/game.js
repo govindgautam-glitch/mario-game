@@ -208,8 +208,11 @@ class Game {
                 window.particleManager.spawnSparkles(x, y - 10, 12, '#fbbf24');
             }
         } else {
-            const shroom = new MushroomPowerup(x - 21, y - 20, content);
-            this.level.mushrooms.push(shroom);
+            const MushroomClass = window.MushroomPowerup || (typeof MushroomPowerup !== 'undefined' ? MushroomPowerup : null);
+            if (MushroomClass) {
+                const shroom = new MushroomClass(x - 21, y - 20, content);
+                this.level.mushrooms.push(shroom);
+            }
         }
     }
 
@@ -309,7 +312,9 @@ class Game {
             }
 
             // Dynamic BGM Zone Tuning
-            const nightRatio = this.level.getNightBlendRatio(this.camera.x);
+            const nightRatio = (this.level && this.level.themeBlend !== undefined)
+                ? this.level.themeBlend
+                : (this.level && this.level.getNightBlendRatio ? this.level.getNightBlendRatio(this.camera.x) : 0);
             if (window.soundManager && window.soundManager.musicPlaying) {
                 window.soundManager.setZone(nightRatio > 0.5 ? 'night' : 'day');
             }

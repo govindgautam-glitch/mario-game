@@ -545,6 +545,10 @@ class Level {
         });
     }
 
+    getNightBlendRatio(cameraX) {
+        return this.themeBlend !== undefined ? this.themeBlend : 0;
+    }
+
     update(dt, player) {
         // Update Smooth Theme Crossfade Easing (350ms)
         if (this.themeBlend !== this.themeTargetBlend) {
@@ -636,8 +640,8 @@ class Level {
         const bgDay = window.spriteManager.rawImages.bgDay;
         const bgNight = window.spriteManager.rawImages.bgNight;
 
-        const w = ctx.canvas.width;
-        const h = ctx.canvas.height;
+        const w = (ctx && ctx.canvas ? ctx.canvas.width : 960) || 960;
+        const h = (ctx && ctx.canvas ? ctx.canvas.height : 540) || 540;
         const scrollX = -(camera.x * 0.28) % w;
 
         // Draw Day Background
@@ -712,4 +716,8 @@ class Level {
     }
 }
 
+window.Block = Block;
+window.PipeSolid = PipeSolid;
+window.CoinItem = CoinItem;
+window.MushroomPowerup = MushroomPowerup;
 window.Level = Level;
