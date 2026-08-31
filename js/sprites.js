@@ -232,31 +232,42 @@ class SpriteManager {
 
     generateCoinFrames() {
         const frames = [];
-        const numFrames = 6;
+        const numFrames = 8;
         for (let i = 0; i < numFrames; i++) {
             const c = document.createElement('canvas');
-            c.width = 36;
-            c.height = 36;
+            c.width = 48;
+            c.height = 48;
             const ctx = c.getContext('2d');
             const scaleX = Math.abs(Math.cos((i / numFrames) * Math.PI));
-            const w = Math.max(4, 30 * scaleX);
+            const w = Math.max(6, 38 * scaleX);
 
             ctx.save();
-            ctx.translate(18, 18);
+            ctx.translate(24, 24);
 
+            // Outer dark amber outline for maximum pop against blue/night sky
+            ctx.fillStyle = '#78350f';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, (w / 2) + 2, 20, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Main gold body
             ctx.fillStyle = '#f59e0b';
             ctx.beginPath();
-            ctx.ellipse(0, 0, w / 2, 15, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, w / 2, 18, 0, 0, Math.PI * 2);
             ctx.fill();
 
+            // Inner shiny gold core
             ctx.fillStyle = '#fbbf24';
             ctx.beginPath();
-            ctx.ellipse(0, 0, (w * 0.75) / 2, 12, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, (w * 0.78) / 2, 14, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            if (scaleX > 0.4) {
-                ctx.fillStyle = '#fffbeb';
-                ctx.fillRect(-2 * scaleX, -7, 4 * scaleX, 14);
+            // Bright specular highlight streak
+            if (scaleX > 0.3) {
+                ctx.fillStyle = '#fef08a';
+                ctx.fillRect(-2 * scaleX, -9, 4 * scaleX, 18);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(-1 * scaleX, -7, 2 * scaleX, 14);
             }
 
             ctx.restore();

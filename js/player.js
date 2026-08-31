@@ -371,37 +371,88 @@ class Player {
     }
 
     enterPipe(pipe, level) {
+        if (this.isPipeTransitioning) return;
         this.isPipeTransitioning = true;
-        this.pipeTimer = 0.35;
+        this.pipePhase = 'descend'; // 'descend' -> 'emerge'
+        this.pipeTimer = 0.45;
+        this.pipeDuration = 0.45;
+        this.pipeEntryPipe = pipe;
         this.pipeTargetTheme = pipe.themeTarget;
         this.pipeTargetX = pipe.targetX;
         this.pipeTargetY = pipe.targetY;
         this.vx = 0;
         this.vy = 0;
+        this.onGround = false;
+
+        // Center player on pipe mouth
+        this.x = pipe.x + pipe.w / 2 - this.width / 2;
 
         if (window.soundManager) {
             window.soundManager.playPipe();
-        }
-
-        if (level && level.setTheme) {
-            level.setTheme(pipe.themeTarget, 0.35);
         }
     }
 
     updatePipeTransition(dt, level) {
         this.pipeTimer -= dt;
-        this.y += 35 * dt; // Smooth downward slide
-        this.updateAnimation(dt);
+        const progress = Math.max(0, Math.min(1, 1 - (this.pipeTimer / (this.pipeDuration || 0.45))));
 
-        if (this.pipeTimer <= 0) {
-            this.isPipeTransitioning = false;
-            if (this.pipeTargetX !== undefined && this.pipeTargetX !== null) {
-                this.x = this.pipeTargetX;
-                this.y = this.pipeTargetY;
+        if (this.pipePhase === 'descend') {
+            // Player physically sinks down into the pipe rim
+            if (this.pipeEntryPipe) {
+                const startY = this.pipeEntryPipe.y - this.height;
+                const endY = this.pipeEntryPipe.y + 12;
+                this.y = startY + (endY - startY) * progress;
+            } else {
+                this.y += 60 * dt;
             }
-            this.vx = 0;
-            this.vy = 0;
-            this.triggerSquash(0.85, 1.25);
+
+            if (this.pipeTimer <= 0) {
+                // Descent animation complete -> Now start theme transition & emerge at exit pipe
+                if (this.pipeTargetX !== undefined && this.pipeTargetX !== null) {
+                    const exitPipe = (level && level.pipes) ? level.pipes.find(p => Math.abs(p.x - this.pipeTargetX) < 160) : null;
+                    this.pipeExitPipe = exitPipe || { x: this.pipeTargetX - 35, y: this.pipeTargetY + this.height, w: 70, h: 100 };
+
+                    this.x = this.pipeExitPipe.x + this.pipeExitPipe.w / 2 - this.width / 2;
+                    this.y = this.pipeExitPipe.y + 12; // fully inside exit pipe
+
+                    this.pipePhase = 'emerge';
+                    this.pipeTimer = 0.45;
+                    this.pipeDuration = 0.45;
+
+                    if (level && level.setTheme) {
+                        level.setTheme(this.pipeTargetTheme, 0.35);
+                    }
+
+                    if (window.soundManager) {
+                        window.soundManager.playPipe();
+                    }
+                } else {
+                    this.isPipeTransitioning = false;
+                    this.pipePhase = null;
+                    this.triggerSquash(0.85, 1.25);
+                }
+            }
+        } else if (this.pipePhase === 'emerge') {
+            // Player physically rises up out of the destination pipe rim
+            if (this.pipeExitPipe) {
+                const startY = this.pipeExitPipe.y + 12;
+                const endY = this.pipeExitPipe.y - this.height;
+                this.y = startY + (endY - startY) * progress;
+            } else {
+                this.y -= 60 * dt;
+            }
+
+            if (this.pipeTimer <= 0) {
+                this.isPipeTransitioning = false;
+                this.pipePhase = null;
+                if (this.pipeExitPipe) {
+                    this.y = this.pipeExitPipe.y - this.height;
+                }
+                this.onGround = true;
+                this.vx = 0;
+                this.vy = 0;
+                this.triggerSquash(0.85, 1.25);
+            }
         }
     }
 
@@ -429,6 +480,21 @@ class Player {
     draw(ctx, camera) {
         const sprites = window.spriteManager ? window.spriteManager.sprites.player : null;
 
+        let hasClip = false;
+        if (this.isPipeTransitioning && this.pipePhase === 'descend' && this.pipeEntryPipe) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, 99999, Math.round(this.pipeEntryPipe.y - camera.y));
+            ctx.clip();
+            hasClip = true;
+        } else if (this.isPipeTransitioning && this.pipePhase === 'emerge' && this.pipeExitPipe) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, 99999, Math.round(this.pipeExitPipe.y - camera.y));
+            ctx.clip();
+            hasClip = true;
+        }
+
         ctx.save();
         // Translate to player bottom center for natural squash & stretch
         const drawX = Math.round(this.x - camera.x);
@@ -450,6 +516,8 @@ class Player {
         if (sprites) {
             if (this.isDead) {
                 spriteToDraw = sprites.jump;
+            } else if (this.isPipeTransitioning) {
+                spriteToDraw = sprites.idle[0]; // Clean upright pose while descending/emerging
             } else if (this.state === 'jump') {
                 spriteToDraw = sprites.jump;
             } else if (this.state === 'skid') {
@@ -461,8 +529,8 @@ class Player {
             }
         }
 
-        // Ground shadow
-        if (this.onGround && !this.isDead) {
+        // Ground shadow (not while in pipe transition or dead)
+        if (this.onGround && !this.isDead && !this.isPipeTransitioning) {
             ctx.save();
             ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
             ctx.beginPath();
@@ -492,6 +560,9 @@ class Player {
         }
 
         ctx.restore();
+        if (hasClip) {
+            ctx.restore();
+        }
     }
 }
 

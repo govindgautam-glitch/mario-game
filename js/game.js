@@ -72,8 +72,9 @@ class Game {
             containerH = window.innerHeight || 540;
         }
 
-        const maxW = Math.min(1280, containerW);
-        const maxH = Math.min(720, containerH);
+        const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+        const maxW = isFullscreen ? containerW : Math.min(1280, containerW);
+        const maxH = isFullscreen ? containerH : Math.min(720, containerH);
 
         const scale = Math.min(maxW / this.width, maxH / this.height);
         const validScale = (scale && scale > 0.1) ? scale : 1;

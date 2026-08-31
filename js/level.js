@@ -155,8 +155,8 @@ class CoinItem {
     constructor(x, y, label = '') {
         this.x = x;
         this.y = y;
-        this.w = 32;
-        this.h = 32;
+        this.w = 40;
+        this.h = 40;
         this.label = label;
         this.isCollected = false;
         this.animTimer = Math.random() * 5;
@@ -220,9 +220,13 @@ class CoinItem {
         if (this.label && !this.isPopping) {
             ctx.save();
             ctx.font = 'bold 9px monospace';
-            ctx.fillStyle = '#78350f';
             ctx.textAlign = 'center';
-            ctx.fillText(this.label, drawX + this.w / 2, drawY + this.h / 2 + 3);
+            ctx.textBaseline = 'middle';
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = '#451a03';
+            ctx.strokeText(this.label, drawX + this.w / 2, drawY + this.h / 2);
+            ctx.fillStyle = '#fffbeb';
+            ctx.fillText(this.label, drawX + this.w / 2, drawY + this.h / 2);
             ctx.restore();
         }
     }

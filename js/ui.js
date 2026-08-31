@@ -165,6 +165,45 @@ class UIManager {
                 }
             });
         }
+
+        // Feature 1: Fullscreen Mode Toggle
+        const fullscreenToggleBtn = document.getElementById('btn-toggle-fullscreen');
+        if (fullscreenToggleBtn) {
+            const updateFullscreenBtn = () => {
+                const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+                fullscreenToggleBtn.innerText = isFs ? '🗗 Exit' : '⛶ Fullscreen';
+                fullscreenToggleBtn.classList.toggle('active', isFs);
+                if (window.gameInstance && window.gameInstance.resize) {
+                    setTimeout(() => window.gameInstance.resize(), 50);
+                    setTimeout(() => window.gameInstance.resize(), 200);
+                }
+            };
+
+            fullscreenToggleBtn.addEventListener('click', async () => {
+                try {
+                    const targetEl = document.getElementById('app-wrapper') || document.documentElement;
+                    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                        if (targetEl.requestFullscreen) {
+                            await targetEl.requestFullscreen();
+                        } else if (targetEl.webkitRequestFullscreen) {
+                            await targetEl.webkitRequestFullscreen();
+                        }
+                    } else {
+                        if (document.exitFullscreen) {
+                            await document.exitFullscreen();
+                        } else if (document.webkitExitFullscreen) {
+                            await document.webkitExitFullscreen();
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Fullscreen toggle request error:', err);
+                }
+                updateFullscreenBtn();
+            });
+
+            document.addEventListener('fullscreenchange', updateFullscreenBtn);
+            document.addEventListener('webkitfullscreenchange', updateFullscreenBtn);
+        }
     }
 
     validateNameInput() {
