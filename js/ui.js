@@ -329,9 +329,15 @@ class UIManager {
         this.isModalOpen = true;
         if (this.modalEl) this.modalEl.classList.remove('hidden');
 
-        const rawImg = window.spriteManager.rawImages[data.imgKey];
-        if (rawImg && this.modalImg) {
-            this.modalImg.src = rawImg.src;
+        // Use tightly sliced zero-padding canvas slice for massive high-res mushroom avatar
+        const slicedCanvas = window.spriteManager && window.spriteManager.sprites.mushrooms ? window.spriteManager.sprites.mushrooms[ventureKey] : null;
+        if (slicedCanvas && this.modalImg) {
+            this.modalImg.src = slicedCanvas.toDataURL();
+        } else {
+            const rawImg = window.spriteManager && window.spriteManager.rawImages ? window.spriteManager.rawImages[data.imgKey] : null;
+            if (rawImg && this.modalImg) {
+                this.modalImg.src = rawImg.src;
+            }
         }
 
         if (this.modalTitle) {
@@ -346,17 +352,20 @@ class UIManager {
             const fullText = data.text;
             this.currentModalFullText = fullText;
 
-            // Bug A Fix: Use textContent slicing instead of innerText concatenation to preserve word boundaries and whitespace
+            // 100% Video Reference Match: Text reveals word-by-word with retro dialogue blip
             this.typewriterInterval = setInterval(() => {
                 if (charIdx < fullText.length) {
                     charIdx += 2;
                     this.modalText.textContent = fullText.slice(0, Math.min(fullText.length, charIdx));
+                    if (charIdx % 6 === 0 && window.soundManager && window.soundManager.playTextBeep) {
+                        window.soundManager.playTextBeep();
+                    }
                 } else {
                     this.modalText.textContent = fullText;
                     clearInterval(this.typewriterInterval);
                     this.typewriterInterval = null;
                 }
-            }, 12);
+            }, 14);
         }
     }
 

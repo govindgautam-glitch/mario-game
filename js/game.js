@@ -321,7 +321,7 @@ class Game {
             }
 
             // Death & Game Over Check
-            if (this.player.isDead && this.player.y > this.level.height + 250) {
+            if (this.player.isDead && this.player.y > this.level.height + 120) {
                 this.lives--;
                 if (this.lives <= 0) {
                     this.state = 'GAMEOVER';

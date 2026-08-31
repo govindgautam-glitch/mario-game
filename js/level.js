@@ -405,12 +405,12 @@ class Level {
         this.themeBlend = 0;
         this.themeTargetBlend = 0;
 
-        // Ground Segments
+        // Ground Segments with Open Pits/Chasms
         const groundSegments = [
-            { x: 0, w: 1400 },
-            { x: 1480, w: 1100 },
-            { x: 2680, w: 1000 },
-            { x: 3780, w: 1420 }
+            { x: 0, w: 1360 },        // Zone 1 Day Ground -> Pit at 1360px - 1500px
+            { x: 1500, w: 1060 },      // Zone 2 Night Ground -> Pit at 2560px - 2700px
+            { x: 2700, w: 1000 },      // Zone 2 Floating Ascent -> Pit at 3700px - 3820px
+            { x: 3820, w: 1380 }       // Zone 3 Final Runway & Studio i HQ
         ];
 
         groundSegments.forEach(g => {
@@ -424,16 +424,16 @@ class Level {
             });
         });
 
-        // Parallax Trees
+        // Parallax Trees (Cleanly positioned on solid islands)
         this.trees = [
             { x: 120, y: this.groundY - 140, type: 'treeGreen', w: 120, h: 140 },
             { x: 420, y: this.groundY - 150, type: 'treePink', w: 130, h: 150 },
             { x: 820, y: this.groundY - 145, type: 'treeGreen', w: 120, h: 145 },
-            { x: 1200, y: this.groundY - 160, type: 'treePine', w: 110, h: 160 },
+            { x: 1040, y: this.groundY - 155, type: 'treePine', w: 110, h: 155 },
             { x: 1700, y: this.groundY - 150, type: 'treeOrange', w: 120, h: 150 },
             { x: 2100, y: this.groundY - 140, type: 'treePink', w: 125, h: 140 },
-            { x: 2900, y: this.groundY - 150, type: 'treeGreen', w: 120, h: 150 },
-            { x: 3400, y: this.groundY - 160, type: 'treePine', w: 115, h: 160 },
+            { x: 2800, y: this.groundY - 150, type: 'treeGreen', w: 120, h: 150 },
+            { x: 3350, y: this.groundY - 155, type: 'treePine', w: 115, h: 155 },
             { x: 4100, y: this.groundY - 150, type: 'treePink', w: 130, h: 150 }
         ];
 
@@ -458,15 +458,16 @@ class Level {
         this.addEnemy(1300, this.groundY - 60, 80);
 
         // Zone 2: Deep Night / Underworld (1600px - 3200px) - Transition Pipe into Night
-        this.addPipe(1520, this.groundY, 'tall', 'night', 1780, 380);
-        this.addEnemy(1680, this.groundY - 60, 100);
+        this.addPipe(1520, this.groundY, 'tall', 'night', 1720, this.groundY);
+        this.addPipe(1720, this.groundY, 'medium'); // Destination exit pipe in Night
+        this.addEnemy(1780, this.groundY - 60, 100);
 
-        this.addBlock(1780, 320, 48, 48, 'brick');
-        this.addBlock(1828, 320, 48, 48, 'brick');
-        this.addBlock(1876, 320, 48, 48, 'qbox', 'innovidea');
+        this.addBlock(1840, 320, 48, 48, 'brick');
+        this.addBlock(1888, 320, 48, 48, 'brick');
+        this.addBlock(1936, 320, 48, 48, 'qbox', 'innovidea');
 
-        this.addCoin(1836, 260);
-        this.addCoin(1884, 260);
+        this.addCoin(1896, 260);
+        this.addCoin(1944, 260);
 
         // Staircase over Pit
         this.addBlock(2050, 310, 48, 48, 'brick');
@@ -493,9 +494,10 @@ class Level {
         this.addEnemy(3020, this.groundY - 60, 120);
 
         // Zone 3: Finale Ascent & Studio i HQ (3200px - 5200px) - Return Pipe to Day
-        this.addPipe(3280, this.groundY, 'short', 'day', 3480, 380);
-        this.addBlock(3420, 280, 48, 48, 'qbox', 'beyondAbility');
-        this.addBlock(3468, 280, 48, 48, 'brick');
+        this.addPipe(3280, this.groundY, 'medium', 'day', 3540, this.groundY);
+        this.addPipe(3540, this.groundY, 'short'); // Destination exit pipe in Day
+        this.addBlock(3620, 280, 48, 48, 'qbox', 'beyondAbility');
+        this.addBlock(3668, 280, 48, 48, 'brick');
 
         this.addEnemy(3560, this.groundY - 60, 100);
 
@@ -564,12 +566,12 @@ class Level {
             }
         }
 
-        // Automatic fallback detection when traversing between zones
-        if (player && !player.isDead) {
-            if (player.x >= 1520 && player.x < 3260 && this.currentTheme !== 'night') {
-                this.setTheme('night', 0.35);
-            } else if (player.x >= 3260 && this.currentTheme !== 'day') {
-                this.setTheme('day', 0.35);
+        // Automatic fallback detection when traversing between zones on foot (bypassed during pipe transitions)
+        if (player && !player.isDead && !player.isPipeTransitioning) {
+            if (player.x >= 1800 && player.x < 3300 && this.currentTheme !== 'night') {
+                this.setTheme('night', 0.40);
+            } else if (player.x >= 3560 && this.currentTheme !== 'day') {
+                this.setTheme('day', 0.40);
             }
         }
 
@@ -611,11 +613,11 @@ class Level {
         // 1. Smooth Parallax Background with Crossfading
         this.drawBackground(ctx, camera, nightRatio);
 
-        // 2. Parallax Trees
+        // 2. Trees (drawn locked to world island coordinates)
         this.trees.forEach(t => {
             const sprite = window.spriteManager.sprites[t.type];
             if (sprite) {
-                const drawX = Math.round(t.x - camera.x * 0.85);
+                const drawX = Math.round(t.x - camera.x);
                 ctx.drawImage(sprite, drawX, t.y, t.w, t.h);
             }
         });
@@ -644,26 +646,56 @@ class Level {
         const bgDay = window.spriteManager.rawImages.bgDay;
         const bgNight = window.spriteManager.rawImages.bgNight;
 
-        const w = (ctx && ctx.canvas ? ctx.canvas.width : 960) || 960;
-        const h = (ctx && ctx.canvas ? ctx.canvas.height : 540) || 540;
-        const scrollX = -(camera.x * 0.28) % w;
+        const viewportW = (ctx && ctx.canvas ? ctx.canvas.width : 960) || 960;
+        const viewportH = (ctx && ctx.canvas ? ctx.canvas.height : 540) || 540;
+        const parallaxX = (camera ? camera.x : 0) * 0.25;
 
-        // Draw Day Background
-        if (bgDay && bgDay.complete && nightRatio < 1) {
+        // Seamless continuous parallax layer renderer with alternating mirror edge-matching
+        const renderSeamlessParallax = (img, alpha) => {
+            if (!img || !img.complete || img.naturalWidth === 0 || alpha <= 0) return;
+
             ctx.save();
-            ctx.globalAlpha = 1 - nightRatio;
-            ctx.drawImage(bgDay, scrollX, 0, w, h);
-            ctx.drawImage(bgDay, scrollX + w, 0, w, h);
+            ctx.globalAlpha = alpha;
+
+            // Preserve authentic 2:1 aspect ratio across vertical height
+            const imgAspect = (img.naturalWidth && img.naturalHeight) ? (img.naturalWidth / img.naturalHeight) : (img.width / img.height || 2);
+            const tileW = Math.max(100, Math.round(viewportH * imgAspect));
+
+            // Compute exact tile index span to cover entire screen with buffer
+            const firstTileIndex = Math.floor((parallaxX - 100) / tileW);
+            const numTiles = Math.ceil(viewportW / tileW) + 3;
+
+            for (let i = 0; i < numTiles; i++) {
+                const tileIndex = firstTileIndex + i;
+                const drawX = Math.floor(tileIndex * tileW - parallaxX);
+
+                // Alternating mirror: even tiles face right, odd tiles mirrored horizontally
+                // Mathematically guarantees adjacent borders have 100% identical pixel colors (no seam or color jump)
+                const isMirrored = Math.abs(tileIndex) % 2 === 1;
+
+                if (isMirrored) {
+                    ctx.save();
+                    ctx.translate(drawX + tileW, 0);
+                    ctx.scale(-1, 1);
+                    // +1px bleed prevents sub-pixel anti-aliasing hairline gaps
+                    ctx.drawImage(img, 0, 0, tileW + 1, viewportH);
+                    ctx.restore();
+                } else {
+                    ctx.drawImage(img, drawX, 0, tileW + 1, viewportH);
+                }
+            }
+
             ctx.restore();
+        };
+
+        // 1. Draw Day Background Layer
+        if (nightRatio < 1) {
+            renderSeamlessParallax(bgDay, 1 - nightRatio);
         }
 
-        // Draw Night Background with Crossfade
-        if (bgNight && bgNight.complete && nightRatio > 0) {
-            ctx.save();
-            ctx.globalAlpha = nightRatio;
-            ctx.drawImage(bgNight, scrollX, 0, w, h);
-            ctx.drawImage(bgNight, scrollX + w, 0, w, h);
-            ctx.restore();
+        // 2. Draw Night Background Layer with Crossfade
+        if (nightRatio > 0) {
+            renderSeamlessParallax(bgNight, nightRatio);
         }
     }
 
@@ -694,6 +726,13 @@ class Level {
                         ctx.restore();
                     }
                 }
+
+                // 3D Cliff Edge Ledge Shading at Pit Boundaries
+                ctx.save();
+                ctx.fillStyle = nightRatio > 0.5 ? 'rgba(10, 8, 30, 0.65)' : 'rgba(30, 15, 5, 0.55)';
+                ctx.fillRect(drawX, drawY + 14, 5, tileH - 14);
+                ctx.fillRect(drawX + g.w - 5, drawY + 14, 5, tileH - 14);
+                ctx.restore();
             } else {
                 ctx.fillStyle = nightRatio > 0.5 ? '#1e1b4b' : '#15803d';
                 ctx.fillRect(drawX, drawY, g.w, 20);

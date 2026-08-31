@@ -182,6 +182,12 @@ class SoundManager {
         });
     }
 
+    playTextBeep() {
+        if (this.muted) return;
+        this.init();
+        this.playTone(460 + Math.random() * 90, 0.025, 'sine', 0.12);
+    }
+
     playStomp() {
         this.playTone(240, 0.12, 'square', 0.5, 60);
         this.playNoise(0.08, 0.4);

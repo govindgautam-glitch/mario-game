@@ -63,22 +63,29 @@ class DistractionEnemy {
             }
         }
 
-        // Apply ground gravity
+        // Apply ground gravity and pit fall handling
         const groundY = level.getGroundY(this.x);
         if (this.y < groundY - this.height) {
             this.vy += 1200 * dt;
             this.y += this.vy * dt;
-            if (this.y >= groundY - this.height) {
+            if (this.y >= groundY - this.height && groundY <= level.height) {
                 this.y = groundY - this.height;
                 this.vy = 0;
             }
-        } else {
+        } else if (groundY <= level.height) {
             this.y = groundY - this.height;
             this.vy = 0;
+        } else {
+            this.vy += 1200 * dt;
+            this.y += this.vy * dt;
+        }
+
+        if (this.y > level.height + 60) {
+            this.isDead = true;
         }
 
         // Player Collision Check
-        if (!player.isDead && !player.isInvulnerable) {
+        if (!player.isDead && !player.isInvulnerable && !player.isPipeTransitioning) {
             const playerBounds = player.getBounds();
             if (this.intersects(playerBounds, bounds)) {
                 // Fix #2: Velocity-aware stomp threshold to prevent race condition on fast falls

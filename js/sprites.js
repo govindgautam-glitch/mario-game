@@ -171,14 +171,14 @@ class SpriteManager {
                 this.sprites.pipeHorizontalNight = this.createTintedCanvas(this.sprites.pipeHorizontal, '#1e293b', 'color', 0.85);
             }
 
-            // Trees
+            // Trees (Cropped cleanly without bottom ground dirt blocks)
             if (this.rawImages.trees) {
                 const t = this.rawImages.trees;
-                this.sprites.treeGreen = this.createCanvasSlice(t, 244, 60, 209, 241);
-                this.sprites.treePink = this.createCanvasSlice(t, 488, 58, 220, 240);
-                this.sprites.treePalm = this.createCanvasSlice(t, 715, 58, 245, 245);
-                this.sprites.treePine = this.createCanvasSlice(t, 383, 320, 172, 220);
-                this.sprites.treeOrange = this.createCanvasSlice(t, 656, 320, 166, 221);
+                this.sprites.treeGreen = this.createCanvasSlice(t, 244, 60, 209, 230);
+                this.sprites.treePink = this.createCanvasSlice(t, 488, 58, 220, 230);
+                this.sprites.treePalm = this.createCanvasSlice(t, 715, 58, 245, 235);
+                this.sprites.treePine = this.createCanvasSlice(t, 383, 320, 172, 172); // Cropped cleanly at trunk base (y=492)
+                this.sprites.treeOrange = this.createCanvasSlice(t, 656, 320, 166, 210);
             }
 
             // Ground Tile (Day & Night)

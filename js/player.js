@@ -1,7 +1,10 @@
-/**
- * Player Class (Studio i Mario)
- * Enhanced with squash-and-stretch physics, inertia curves, coyote time, and polished animations.
- */
+const PIPE_STATE = {
+    NORMAL: 'NORMAL',
+    PIPE_ENTERING: 'PIPE_ENTERING',
+    PIPE_TRAVEL: 'PIPE_TRAVEL',
+    PIPE_EXITING: 'PIPE_EXITING'
+};
+
 class Player {
     constructor(x, y) {
         this.startX = x;
@@ -48,8 +51,17 @@ class Player {
         this.invulnerableTimer = 0;
         this.isSlidingFlag = false;
         this.isEnteringBuilding = false;
-        this.isPipeTransitioning = false;
+
+        // Pipe Transition State Machine (Authoritative 0.7s - 1.2s Spec)
+        this.pipeState = PIPE_STATE.NORMAL;
         this.pipeTimer = 0;
+        this.pipeDuration = 0;
+        this.pipeEntryDuration = 0.85;  // 0.85s visible deliberate descent (0.7-1.2s range)
+        this.pipeTravelDuration = 0.40; // 0.40s dark hold travel moment
+        this.pipeExitDuration = 0.85;   // 0.85s visible deliberate emergence (0.7-1.2s range)
+        this.pipeCooldown = 0;
+        this.pipeEntryPipe = null;
+        this.pipeExitPipe = null;
         this.pipeTargetTheme = null;
         this.pipeTargetX = null;
         this.pipeTargetY = null;
@@ -64,6 +76,10 @@ class Player {
         this.state = 'idle'; // idle, run, jump, fall, skid, land, die
     }
 
+    get isPipeTransitioning() {
+        return this.pipeState !== PIPE_STATE.NORMAL;
+    }
+
     triggerSquash(sx, sy) {
         this.scaleX = sx;
         this.scaleY = sy;
@@ -75,7 +91,7 @@ class Player {
             return;
         }
 
-        if (this.isPipeTransitioning) {
+        if (this.pipeState !== PIPE_STATE.NORMAL) {
             this.updatePipeTransition(dt, level);
             return;
         }
@@ -170,6 +186,11 @@ class Player {
             if (window.soundManager) window.soundManager.playJump();
         }
 
+        // Cooldown timer after exiting pipe to prevent accidental re-entry while holding Down
+        if (this.pipeCooldown > 0) {
+            this.pipeCooldown -= dt;
+        }
+
         // Variable Jump Height Gravity
         let currentGravity = this.gravityNormal;
         if (this.vy < 0) {
@@ -201,9 +222,15 @@ class Player {
             this.triggerSquash(1.24, 0.78);
         }
 
-        // Pit Fall Check
-        if (this.y > level.height + 150) {
-            this.die();
+        // Pit Fall Check: Fall realistically through the chasm down into the void
+        if (this.y > level.groundY + 20 && !this.isDead) {
+            this.isFallingIntoPit = true;
+            this.vx *= 0.90; // Natural air deceleration in pit
+            this.state = 'jump';
+        }
+
+        if (this.y > level.height + 60 && !this.isDead) {
+            this.die(true); // Pit death: smoothly drops into abyss
         }
 
         // Update Animation Frame
@@ -249,12 +276,11 @@ class Player {
                     this.y = solid.y - this.height;
                     this.vy = 0;
                     this.onGround = true;
+                    this.isJumping = false;
                 } else if (this.vy < 0) {
-                    // Hitting from below
+                    // Hitting block from below
                     this.y = solid.y + solid.h;
                     this.vy = 0;
-                    // Bump squash
-                    this.triggerSquash(1.2, 0.82);
                     if (solid.onHitFromBelow) {
                         solid.onHitFromBelow(this);
                     }
@@ -281,13 +307,18 @@ class Player {
         };
     }
 
-    die() {
+    die(isPit = false) {
         if (this.isDead) return;
         this.isDead = true;
-        this.vy = -560;
         this.vx = 0;
-        this.triggerSquash(0.9, 1.2);
-        if (window.gameInstance) window.gameInstance.triggerScreenShake(8, 0.35);
+        if (isPit) {
+            this.vy = Math.max(320, this.vy); // Maintain realistic downward fall acceleration into void
+            this.triggerSquash(0.85, 1.25);
+        } else {
+            this.vy = -560; // Upward shock bounce on enemy impact
+            this.triggerSquash(0.9, 1.2);
+            if (window.gameInstance) window.gameInstance.triggerScreenShake(8, 0.35);
+        }
         if (window.soundManager) {
             window.soundManager.stopMusic();
             window.soundManager.playHurt();
@@ -296,7 +327,7 @@ class Player {
     }
 
     takeDamage() {
-        if (this.isInvulnerable || this.isDead || this.isSlidingFlag) return false;
+        if (this.isInvulnerable || this.isDead || this.isSlidingFlag || this.isPipeTransitioning) return false;
         this.die();
         return true;
     }
@@ -347,8 +378,9 @@ class Player {
     }
 
     checkPipeInteraction(input, level) {
-        if (this.isPipeTransitioning || this.isDead || this.isSlidingFlag || this.isEnteringBuilding) return;
+        if (this.pipeState !== PIPE_STATE.NORMAL || this.isDead || this.isSlidingFlag || this.isEnteringBuilding) return;
         if (!level || !level.pipes) return;
+        if (this.pipeCooldown > 0) return;
 
         const isCrouch = input.isCrouch();
 
@@ -371,11 +403,12 @@ class Player {
     }
 
     enterPipe(pipe, level) {
-        if (this.isPipeTransitioning) return;
-        this.isPipeTransitioning = true;
-        this.pipePhase = 'descend'; // 'descend' -> 'emerge'
-        this.pipeTimer = 0.45;
-        this.pipeDuration = 0.45;
+        if (this.pipeState !== PIPE_STATE.NORMAL) return;
+
+        // Advance to Phase 1: PIPE_ENTERING
+        this.pipeState = PIPE_STATE.PIPE_ENTERING;
+        this.pipeDuration = this.pipeEntryDuration; // 0.85s (0.7 - 1.2s range)
+        this.pipeTimer = this.pipeEntryDuration;
         this.pipeEntryPipe = pipe;
         this.pipeTargetTheme = pipe.themeTarget;
         this.pipeTargetX = pipe.targetX;
@@ -384,8 +417,8 @@ class Player {
         this.vy = 0;
         this.onGround = false;
 
-        // Center player on pipe mouth
-        this.x = pipe.x + pipe.w / 2 - this.width / 2;
+        // Center player precisely on pipe mouth
+        this.x = pipe.x + pipe.w / 2;
 
         if (window.soundManager) {
             window.soundManager.playPipe();
@@ -394,64 +427,83 @@ class Player {
 
     updatePipeTransition(dt, level) {
         this.pipeTimer -= dt;
-        const progress = Math.max(0, Math.min(1, 1 - (this.pipeTimer / (this.pipeDuration || 0.45))));
 
-        if (this.pipePhase === 'descend') {
-            // Player physically sinks down into the pipe rim
+        if (this.pipeState === PIPE_STATE.PIPE_ENTERING) {
+            // STATE 1: PIPE_ENTERING (exactly 0.85s): player moves downward through rim with ease-in
+            const t = Math.max(0, Math.min(1, 1 - (this.pipeTimer / this.pipeEntryDuration)));
+            const eased = t * t; // ease-in
+
             if (this.pipeEntryPipe) {
                 const startY = this.pipeEntryPipe.y - this.height;
-                const endY = this.pipeEntryPipe.y + 12;
-                this.y = startY + (endY - startY) * progress;
-            } else {
-                this.y += 60 * dt;
+                const endY = this.pipeEntryPipe.y + this.height + 20; // Full 160px descent
+                this.y = startY + (endY - startY) * eased;
             }
 
             if (this.pipeTimer <= 0) {
-                // Descent animation complete -> Now start theme transition & emerge at exit pipe
+                // SINK COMPLETE: Player is 100% hidden inside pipe.
+                // Advance to STATE 2: PIPE_TRAVEL (0.40s dark hold moment)
+                this.pipeState = PIPE_STATE.PIPE_TRAVEL;
+                this.pipeDuration = this.pipeTravelDuration; // exactly 0.40s
+                this.pipeTimer = this.pipeTravelDuration;
+
+                // Position player inside destination exit pipe (fully submerged below exit rim)
                 if (this.pipeTargetX !== undefined && this.pipeTargetX !== null) {
                     const exitPipe = (level && level.pipes) ? level.pipes.find(p => Math.abs(p.x - this.pipeTargetX) < 160) : null;
-                    this.pipeExitPipe = exitPipe || { x: this.pipeTargetX - 35, y: this.pipeTargetY + this.height, w: 70, h: 100 };
+                    this.pipeExitPipe = exitPipe || { x: this.pipeTargetX, y: (this.pipeTargetY || level.groundY) - 95, w: 68, h: 95 };
 
-                    this.x = this.pipeExitPipe.x + this.pipeExitPipe.w / 2 - this.width / 2;
-                    this.y = this.pipeExitPipe.y + 12; // fully inside exit pipe
+                    this.x = this.pipeExitPipe.x + this.pipeExitPipe.w / 2;
+                    this.y = this.pipeExitPipe.y + this.height + 20; // Hidden below exit pipe rim
 
-                    this.pipePhase = 'emerge';
-                    this.pipeTimer = 0.45;
-                    this.pipeDuration = 0.45;
-
-                    if (level && level.setTheme) {
-                        level.setTheme(this.pipeTargetTheme, 0.35);
+                    // Smooth camera target repositioning
+                    if (window.gameInstance) {
+                        const targetCamX = this.x - window.gameInstance.width * 0.35;
+                        window.gameInstance.camera.x = Math.max(0, Math.min(level.width - window.gameInstance.width, targetCamX));
                     }
+                }
 
-                    if (window.soundManager) {
-                        window.soundManager.playPipe();
-                    }
-                } else {
-                    this.isPipeTransitioning = false;
-                    this.pipePhase = null;
-                    this.triggerSquash(0.85, 1.25);
+                // THEME TRANSITION BEGINS HERE: Trigger theme crossfade at the START of PIPE_TRAVEL
+                if (level && level.setTheme) {
+                    level.setTheme(this.pipeTargetTheme, this.pipeTravelDuration);
                 }
             }
-        } else if (this.pipePhase === 'emerge') {
-            // Player physically rises up out of the destination pipe rim
+        } else if (this.pipeState === PIPE_STATE.PIPE_TRAVEL) {
+            // STATE 2: PIPE_TRAVEL (0.40s): holding dark state while player is hidden
             if (this.pipeExitPipe) {
-                const startY = this.pipeExitPipe.y + 12;
-                const endY = this.pipeExitPipe.y - this.height;
-                this.y = startY + (endY - startY) * progress;
-            } else {
-                this.y -= 60 * dt;
+                this.y = this.pipeExitPipe.y + this.height + 20;
             }
 
             if (this.pipeTimer <= 0) {
-                this.isPipeTransitioning = false;
-                this.pipePhase = null;
+                // TRAVEL COMPLETE: Advance to STATE 3: PIPE_EXITING
+                this.pipeState = PIPE_STATE.PIPE_EXITING;
+                this.pipeDuration = this.pipeExitDuration; // exactly 0.85s
+                this.pipeTimer = this.pipeExitDuration;
+
+                if (window.soundManager) {
+                    window.soundManager.playPipe();
+                }
+            }
+        } else if (this.pipeState === PIPE_STATE.PIPE_EXITING) {
+            // STATE 3: PIPE_EXITING (exactly 0.85s): player moves upward through rim with ease-out
+            const t = Math.max(0, Math.min(1, 1 - (this.pipeTimer / this.pipeExitDuration)));
+            const eased = 1 - Math.pow(1 - t, 2); // ease-out
+
+            if (this.pipeExitPipe) {
+                const startY = this.pipeExitPipe.y + this.height + 20; // Starts fully below rim
+                const endY = this.pipeExitPipe.y - this.height; // Ends standing on rim
+                this.y = startY + (endY - startY) * eased;
+            }
+
+            if (this.pipeTimer <= 0) {
+                // STATE 4: NORMAL gameplay resumption
+                this.pipeState = PIPE_STATE.NORMAL;
                 if (this.pipeExitPipe) {
                     this.y = this.pipeExitPipe.y - this.height;
                 }
                 this.onGround = true;
                 this.vx = 0;
                 this.vy = 0;
-                this.triggerSquash(0.85, 1.25);
+                this.pipeCooldown = 0.6;
+                this.triggerSquash(0.88, 1.22);
             }
         }
     }
@@ -478,22 +530,41 @@ class Player {
     }
 
     draw(ctx, camera) {
-        const sprites = window.spriteManager ? window.spriteManager.sprites.player : null;
-
-        let hasClip = false;
-        if (this.isPipeTransitioning && this.pipePhase === 'descend' && this.pipeEntryPipe) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(0, 0, 99999, Math.round(this.pipeEntryPipe.y - camera.y));
-            ctx.clip();
-            hasClip = true;
-        } else if (this.isPipeTransitioning && this.pipePhase === 'emerge' && this.pipeExitPipe) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(0, 0, 99999, Math.round(this.pipeExitPipe.y - camera.y));
-            ctx.clip();
-            hasClip = true;
+        if (this.pipeState === PIPE_STATE.PIPE_ENTERING || this.pipeState === PIPE_STATE.PIPE_EXITING || this.pipeState === PIPE_STATE.PIPE_TRAVEL) {
+            this.drawPlayerDuringPipeTransition(ctx, camera);
+            return;
         }
+
+        this.drawNormal(ctx, camera, false);
+    }
+
+    drawPlayerDuringPipeTransition(ctx, camera) {
+        if (this.pipeState === PIPE_STATE.PIPE_TRAVEL) {
+            return; // Player is 100% hidden during travel state
+        }
+
+        const activePipe = (this.pipeState === PIPE_STATE.PIPE_ENTERING) ? this.pipeEntryPipe : this.pipeExitPipe;
+        if (!activePipe) {
+            this.drawNormal(ctx, camera, true);
+            return;
+        }
+
+        const pipeRimY = Math.round(activePipe.y - camera.y);
+
+        ctx.save();
+        ctx.beginPath();
+        // Only allow drawing ABOVE the pipe's rim (i.e., y < pipeRimY)
+        ctx.rect(0, 0, (ctx.canvas ? ctx.canvas.width : 960), pipeRimY);
+        ctx.clip();
+
+        // Draw the player sprite completely normally at its real position
+        this.drawNormal(ctx, camera, true);
+
+        ctx.restore();
+    }
+
+    drawNormal(ctx, camera, inPipeTransition = false) {
+        const sprites = window.spriteManager ? window.spriteManager.sprites.player : null;
 
         ctx.save();
         // Translate to player bottom center for natural squash & stretch
@@ -502,7 +573,9 @@ class Player {
         ctx.translate(drawX, drawY);
 
         // Apply Squash & Stretch from the ground/pivot
-        ctx.scale(this.facing * this.scaleX, this.scaleY);
+        const sx = inPipeTransition ? 1.0 : this.scaleX;
+        const sy = inPipeTransition ? 1.0 : this.scaleY;
+        ctx.scale(this.facing * sx, sy);
 
         // Flashing when invulnerable
         if (this.isInvulnerable && Math.floor(this.invulnerableTimer * 20) % 2 === 0) {
@@ -516,7 +589,7 @@ class Player {
         if (sprites) {
             if (this.isDead) {
                 spriteToDraw = sprites.jump;
-            } else if (this.isPipeTransitioning) {
+            } else if (inPipeTransition) {
                 spriteToDraw = sprites.idle[0]; // Clean upright pose while descending/emerging
             } else if (this.state === 'jump') {
                 spriteToDraw = sprites.jump;
@@ -530,7 +603,7 @@ class Player {
         }
 
         // Ground shadow (not while in pipe transition or dead)
-        if (this.onGround && !this.isDead && !this.isPipeTransitioning) {
+        if (this.onGround && !this.isDead && !inPipeTransition) {
             ctx.save();
             ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
             ctx.beginPath();
@@ -560,9 +633,6 @@ class Player {
         }
 
         ctx.restore();
-        if (hasClip) {
-            ctx.restore();
-        }
     }
 }
 
