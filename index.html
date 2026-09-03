@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Studio i - Mario Adventure</title>
-    <link rel="stylesheet" href="css/style.css?v=3.0">
+    <link rel="stylesheet" href="css/style.css?v=3.8">
+    <link rel="stylesheet" href="css/mobile.css?v=3.8">
 </head>
 <body>
     <div id="app-wrapper">
@@ -162,15 +163,25 @@
                 </div>
             </div>
 
+            <!-- Mobile Orientation Warning Overlay -->
+            <div id="rotate-device-overlay" class="hidden">
+                <div class="rotate-card">
+                    <div class="rotate-icon">📱 ↷</div>
+                    <h2>PLEASE ROTATE DEVICE</h2>
+                    <p>Rotate your phone to landscape orientation for the best Studio i platformer experience.</p>
+                </div>
+            </div>
+
             <!-- Virtual Touch Controls for Mobile / Responsive -->
             <div id="touch-controls">
                 <div class="touch-dpad">
-                    <button id="btn-left" class="touch-btn">◀</button>
-                    <button id="btn-right" class="touch-btn">▶</button>
+                    <button id="btn-left" class="touch-btn" aria-label="Left">◀</button>
+                    <button id="btn-down" class="touch-btn" aria-label="Down / Pipe">▼</button>
+                    <button id="btn-right" class="touch-btn" aria-label="Right">▶</button>
                 </div>
                 <div class="touch-actions">
-                    <button id="btn-sprint" class="touch-btn">🏃</button>
-                    <button id="btn-jump" class="touch-btn btn-jump-action">▲</button>
+                    <button id="btn-sprint" class="touch-btn" aria-label="Sprint">⚡</button>
+                    <button id="btn-jump" class="touch-btn btn-jump-action" aria-label="Jump">▲</button>
                 </div>
             </div>
         </div>
@@ -186,5 +197,6 @@
     <script src="js/level.js?v=3.8"></script>
     <script src="js/ui.js?v=3.8"></script>
     <script src="js/game.js?v=3.8"></script>
+    <script src="js/mobile.js?v=3.8"></script>
 </body>
 </html>

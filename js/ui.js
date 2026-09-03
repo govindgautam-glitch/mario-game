@@ -237,6 +237,18 @@ class UIManager {
         });
     }
 
+    refreshActiveLeaderboards(list, highlightName = '', highlightScore = -1) {
+        if (this.startScreen && !this.startScreen.classList.contains('hidden')) {
+            this.renderLeaderboard('start-leaderboard-list', list);
+        }
+        if (this.gameOverScreen && !this.gameOverScreen.classList.contains('hidden')) {
+            this.renderLeaderboard('gameover-leaderboard-list', list, highlightName, highlightScore);
+        }
+        if (this.victoryScreen && !this.victoryScreen.classList.contains('hidden')) {
+            this.renderLeaderboard('victory-leaderboard-list', list, highlightName, highlightScore);
+        }
+    }
+
     escapeHTML(str) {
         return String(str)
             .replace(/&/g, '&amp;')

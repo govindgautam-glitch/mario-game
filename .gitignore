@@ -13,9 +13,13 @@ Desktop.ini
 *.log
 npm-debug.log*
 
-# Environment & Credentials
+# Environment & Credentials (NEVER COMMIT REAL CREDENTIALS)
 .env
-.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
 *.pem
 *.key
 

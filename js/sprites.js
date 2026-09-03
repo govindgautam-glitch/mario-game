@@ -171,14 +171,14 @@ class SpriteManager {
                 this.sprites.pipeHorizontalNight = this.createTintedCanvas(this.sprites.pipeHorizontal, '#1e293b', 'color', 0.85);
             }
 
-            // Trees (Cropped cleanly without bottom ground dirt blocks)
+            // Trees (Clean full-height slices with unclipped crowns and zero cutoff)
             if (this.rawImages.trees) {
                 const t = this.rawImages.trees;
-                this.sprites.treeGreen = this.createCanvasSlice(t, 244, 60, 209, 230);
-                this.sprites.treePink = this.createCanvasSlice(t, 488, 58, 220, 230);
-                this.sprites.treePalm = this.createCanvasSlice(t, 715, 58, 245, 235);
-                this.sprites.treePine = this.createCanvasSlice(t, 383, 320, 172, 172); // Cropped cleanly at trunk base (y=492)
-                this.sprites.treeOrange = this.createCanvasSlice(t, 656, 320, 166, 210);
+                this.sprites.treeGreen = this.createCanvasSlice(t, 240, 55, 220, 215);
+                this.sprites.treePink = this.createCanvasSlice(t, 462, 55, 246, 215);
+                this.sprites.treePalm = this.createCanvasSlice(t, 710, 55, 250, 215);
+                this.sprites.treePine = this.createCanvasSlice(t, 350, 305, 220, 210); // Clean full-height pine tree crown + trunk base
+                this.sprites.treeOrange = this.createCanvasSlice(t, 600, 305, 260, 210); // Clean full-height orange tree crown + trunk base
             }
 
             // Ground Tile (Day & Night)
@@ -193,9 +193,28 @@ class SpriteManager {
 
             // Flagpole & Goal Building
             if (this.rawImages.flagpole) {
+                // Fallback composite
                 this.sprites.flagpole = this.createCanvasSlice(
                     this.rawImages.flagpole,
                     91, 147, 449, 992
+                );
+
+                // 1. Pole only (shaft + finial ball + base block with clean continuous pole shaft)
+                const poleCanvas = document.createElement('canvas');
+                poleCanvas.width = 449;
+                poleCanvas.height = 992;
+                const pctx = poleCanvas.getContext('2d');
+                pctx.drawImage(this.rawImages.flagpole, 91, 147, 449, 992, 0, 0, 449, 992);
+                // Clear the static flag region (in 19.png coordinates: x: 235..545, y: 190..630)
+                pctx.clearRect(144, 43, 305, 440);
+                // Draw clean continuous pole shaft through the cleared region (sample clean shaft from y:650..750)
+                pctx.drawImage(this.rawImages.flagpole, 201, 650, 34, 100, 110, 43, 34, 440);
+                this.sprites.flagPoleOnly = poleCanvas;
+
+                // 2. Separate Flag Banner
+                this.sprites.flagBanner = this.createCanvasSlice(
+                    this.rawImages.flagpole,
+                    230, 200, 310, 400
                 );
             }
 

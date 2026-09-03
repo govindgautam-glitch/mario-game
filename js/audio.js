@@ -229,6 +229,14 @@ class SoundManager {
         osc.stop(now + 1.0);
     }
 
+    playFlagDing() {
+        if (this.muted) return;
+        this.init();
+        // High bright chime/ding when flag reaches the top of the pole
+        this.playTone(1318.51, 0.22, 'sine', 0.45); // E6
+        setTimeout(() => this.playTone(1760.00, 0.35, 'sine', 0.5), 50); // A6
+    }
+
     playVictory() {
         if (this.muted) return;
         this.init();

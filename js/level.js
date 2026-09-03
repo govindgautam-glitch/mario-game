@@ -378,10 +378,27 @@ class Level {
         this.themeTargetBlend = 0;
         this.themeTransitionDuration = 0.35; // 350ms smooth crossfade
 
-        this.flagpole = { x: 4400, y: 110, w: 46, h: 340 };
+        this.flagpole = {
+            x: 4400,
+            y: 110,
+            w: 46,
+            h: 340,
+            flagProgress: 0,
+            isRaising: false,
+            raised: false,
+            animTimer: 0,
+            raiseDuration: 0.65
+        };
         this.building = { x: 4620, y: 160, w: 320, h: 290 };
 
         this.buildLevel();
+    }
+
+    startFlagRaise() {
+        if (this.flagpole.isRaising || this.flagpole.raised) return;
+        this.flagpole.isRaising = true;
+        this.flagpole.flagProgress = 0;
+        this.flagpole.animTimer = 0;
     }
 
     setTheme(themeName, duration = 0.35) {
@@ -404,6 +421,18 @@ class Level {
         this.currentTheme = 'day';
         this.themeBlend = 0;
         this.themeTargetBlend = 0;
+
+        this.flagpole = {
+            x: 4400,
+            y: 110,
+            w: 46,
+            h: 340,
+            flagProgress: 0,
+            isRaising: false,
+            raised: false,
+            animTimer: 0,
+            raiseDuration: 0.65
+        };
 
         // Ground Segments with Open Pits/Chasms
         const groundSegments = [
@@ -446,40 +475,40 @@ class Level {
         this.addCoin(520, 390, 'IRR');
         this.addCoin(570, 390, '$ ROI');
 
-        this.addPipe(680, this.groundY, 'short');
-        this.addEnemy(800, this.groundY - 60, 110);
+        this.addPipe(660, this.groundY, 'short');
+        this.addEnemy(820, this.groundY - 60, 70);
 
-        this.addBlock(920, 290, 48, 48, 'qbox', 'innoveda');
-        this.addBlock(968, 290, 48, 48, 'brick');
-        this.addBlock(1016, 290, 48, 48, 'brick');
-        this.addBlock(1064, 290, 48, 48, 'qbox', 'coin');
+        this.addBlock(940, 290, 48, 48, 'qbox', 'innoveda');
+        this.addBlock(988, 290, 48, 48, 'brick');
+        this.addBlock(1036, 290, 48, 48, 'brick');
+        this.addBlock(1084, 290, 48, 48, 'qbox', 'coin');
 
-        this.addPipe(1180, this.groundY, 'medium');
-        this.addEnemy(1300, this.groundY - 60, 80);
+        this.addPipe(1200, this.groundY, 'medium');
+        this.addEnemy(1360, this.groundY - 60, 60);
 
         // Zone 2: Deep Night / Underworld (1600px - 3200px) - Transition Pipe into Night
-        this.addPipe(1520, this.groundY, 'tall', 'night', 1720, this.groundY);
-        this.addPipe(1720, this.groundY, 'medium'); // Destination exit pipe in Night
-        this.addEnemy(1780, this.groundY - 60, 100);
+        this.addPipe(1520, this.groundY, 'tall', 'night', 1700, this.groundY);
+        this.addPipe(1700, this.groundY, 'medium'); // Destination exit pipe in Night
+        this.addEnemy(1860, this.groundY - 60, 60); // Clean 68px runway from exit pipe
 
-        this.addBlock(1840, 320, 48, 48, 'brick');
-        this.addBlock(1888, 320, 48, 48, 'brick');
-        this.addBlock(1936, 320, 48, 48, 'qbox', 'innovidea');
+        this.addBlock(1960, 320, 48, 48, 'brick');
+        this.addBlock(2008, 320, 48, 48, 'brick');
+        this.addBlock(2056, 320, 48, 48, 'qbox', 'innovidea');
 
-        this.addCoin(1896, 260);
-        this.addCoin(1944, 260);
+        this.addCoin(2016, 260);
+        this.addCoin(2064, 260);
 
         // Staircase over Pit
-        this.addBlock(2050, 310, 48, 48, 'brick');
-        this.addBlock(2098, 270, 48, 48, 'brick');
-        this.addBlock(2146, 230, 48, 48, 'qbox', 'bharat');
-        this.addBlock(2194, 230, 48, 48, 'brick');
+        this.addBlock(2160, 310, 48, 48, 'brick');
+        this.addBlock(2208, 270, 48, 48, 'brick');
+        this.addBlock(2256, 230, 48, 48, 'qbox', 'bharat');
+        this.addBlock(2304, 230, 48, 48, 'brick');
 
-        this.addCoin(2106, 210);
-        this.addCoin(2202, 180);
+        this.addCoin(2216, 210);
+        this.addCoin(2312, 180);
 
-        this.addPipe(2380, this.groundY, 'medium');
-        this.addEnemy(2480, this.groundY - 60, 90);
+        this.addPipe(2460, this.groundY, 'medium');
+        this.addEnemy(2580, this.groundY - 60, 70);
 
         // Floating Coin Island
         this.addBlock(2750, 290, 48, 48, 'brick');
@@ -491,24 +520,24 @@ class Level {
         this.addCoin(2854, 230);
         this.addCoin(2902, 230);
 
-        this.addEnemy(3020, this.groundY - 60, 120);
+        this.addEnemy(3020, this.groundY - 60, 100);
 
         // Zone 3: Finale Ascent & Studio i HQ (3200px - 5200px) - Return Pipe to Day
-        this.addPipe(3280, this.groundY, 'medium', 'day', 3540, this.groundY);
-        this.addPipe(3540, this.groundY, 'short'); // Destination exit pipe in Day
-        this.addBlock(3620, 280, 48, 48, 'qbox', 'beyondAbility');
-        this.addBlock(3668, 280, 48, 48, 'brick');
+        this.addPipe(3300, this.groundY, 'medium', 'day', 3520, this.groundY);
+        this.addPipe(3520, this.groundY, 'short'); // Destination exit pipe in Day
+        this.addEnemy(3680, this.groundY - 60, 60); // Clean 68px runway from exit pipe
 
-        this.addEnemy(3560, this.groundY - 60, 100);
+        this.addBlock(3780, 280, 48, 48, 'qbox', 'beyondAbility');
+        this.addBlock(3828, 280, 48, 48, 'brick');
 
         // Ascending Pipes
-        this.addPipe(3840, this.groundY, 'short');
-        this.addPipe(3960, this.groundY, 'medium');
-        this.addPipe(4080, this.groundY, 'tall');
+        this.addPipe(3960, this.groundY, 'short');
+        this.addPipe(4080, this.groundY, 'medium');
+        this.addPipe(4200, this.groundY, 'tall');
 
-        this.addCoin(3855, 340, 'GTM');
-        this.addCoin(3975, 300, 'SCALE');
-        this.addCoin(4095, 250, 'GROW');
+        this.addCoin(3975, 340, 'GTM');
+        this.addCoin(4095, 300, 'SCALE');
+        this.addCoin(4215, 250, 'GROW');
     }
 
     addBlock(x, y, w, h, type, content = null) {
@@ -580,7 +609,7 @@ class Level {
         this.mushrooms.forEach(m => m.update(dt, this, player));
         this.enemies.forEach(e => e.update(dt, this, player));
 
-        // Flagpole Grab
+        // Flagpole Grab & Animation Trigger
         if (
             !player.isDead &&
             !player.isSlidingFlag &&
@@ -592,11 +621,31 @@ class Level {
                 pBounds.x < this.flagpole.x + this.flagpole.w &&
                 pBounds.y + pBounds.h > this.flagpole.y
             ) {
+                this.startFlagRaise();
                 player.grabFlagpole(this.flagpole);
                 if (window.gameInstance) {
                     window.gameInstance.onFlagpoleReached();
                 }
             }
+        }
+
+        // Flag Raise Animation (0.65s Ease-Out Cubic from bottom to top)
+        if (this.flagpole.isRaising) {
+            this.flagpole.animTimer += dt;
+            const t = Math.min(1, this.flagpole.animTimer / this.flagpole.raiseDuration);
+            // Ease-out cubic: fast start, gentle settling at top
+            this.flagpole.flagProgress = 1 - Math.pow(1 - t, 3);
+
+            if (t >= 1) {
+                this.flagpole.isRaising = false;
+                this.flagpole.raised = true;
+                this.flagpole.flagProgress = 1;
+                if (window.soundManager && window.soundManager.playFlagDing) {
+                    window.soundManager.playFlagDing();
+                }
+            }
+        } else if (this.flagpole.raised) {
+            this.flagpole.animTimer += dt;
         }
 
         // Victory Entrance at Studio i Building
@@ -743,14 +792,41 @@ class Level {
     }
 
     drawGoalElements(ctx, camera) {
-        const flagSprite = window.spriteManager.sprites.flagpole;
-        if (flagSprite) {
+        const poleSprite = window.spriteManager ? (window.spriteManager.sprites.flagPoleOnly || window.spriteManager.sprites.flagpole) : null;
+        const flagBanner = window.spriteManager ? window.spriteManager.sprites.flagBanner : null;
+
+        if (poleSprite) {
             const drawX = Math.round(this.flagpole.x - camera.x);
             const drawY = Math.round(this.flagpole.y - camera.y);
-            ctx.drawImage(flagSprite, drawX, drawY, 120, 340);
+            const poleW = 120;
+            const poleH = 340;
+
+            // 1. Draw Clean Pole Shaft, Finial Ball & Base Block
+            ctx.drawImage(poleSprite, drawX, drawY, poleW, poleH);
+
+            // 2. Draw Animated Flag Banner (smoothly rises from bottom to top with ease-out)
+            if (flagBanner) {
+                const flagX = drawX + 38;
+                const flagW = 83;
+                const flagH = 137;
+
+                // Bottom position (above base block) vs Top position (under golden ball)
+                const bottomY = drawY + 155;
+                const topY = drawY + 18;
+                const progress = this.flagpole.flagProgress !== undefined ? this.flagpole.flagProgress : 0;
+                const baseFlagY = bottomY + (topY - bottomY) * progress;
+
+                // Subtle lively flutter wave once raised
+                let flutter = 0;
+                if (progress > 0) {
+                    flutter = Math.sin(this.flagpole.animTimer * 10) * 1.5;
+                }
+
+                ctx.drawImage(flagBanner, flagX, baseFlagY + flutter, flagW + (flutter * 0.5), flagH);
+            }
         }
 
-        const bldgSprite = window.spriteManager.sprites.building;
+        const bldgSprite = window.spriteManager ? window.spriteManager.sprites.building : null;
         if (bldgSprite) {
             const drawX = Math.round(this.building.x - camera.x);
             const drawY = Math.round(this.building.y - camera.y);

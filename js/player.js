@@ -382,11 +382,9 @@ class Player {
         if (!level || !level.pipes) return;
         if (this.pipeCooldown > 0) return;
 
-        const isCrouch = input.isCrouch();
-
         for (const pipe of level.pipes) {
             if (pipe.isTransitionPipe && pipe.themeTarget) {
-                // Check if Mario is standing on the pipe rim
+                // Check if Mario has reached / is standing on the transition pipe rim
                 const onPipeTop = (
                     this.onGround &&
                     this.x >= pipe.x + 8 &&
@@ -394,7 +392,7 @@ class Player {
                     Math.abs((this.y + this.height) - pipe.y) < 14
                 );
 
-                if (onPipeTop && isCrouch) {
+                if (onPipeTop) {
                     this.enterPipe(pipe, level);
                     break;
                 }

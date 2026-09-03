@@ -1,0 +1,48 @@
+name: CI Pre-Deploy Checks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    name: Build & Code Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Syntax & Sanity Checks
+        run: |
+          node -c server.js
+          node -c api/index.js
+          node -e "
+            const fs = require('fs');
+            const files = [
+              'js/sprites.js',
+              'js/audio.js',
+              'js/level.js',
+              'js/player.js',
+              'js/game.js',
+              'js/ui.js',
+              'js/input.js',
+              'js/mobile.js'
+            ];
+            files.forEach(file => {
+              const code = fs.readFileSync(file, 'utf8');
+              new Function(code);
+              console.log('✅ ' + file + ' passed syntax validation');
+            });
+          "

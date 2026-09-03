@@ -11,6 +11,7 @@ class InputHandler {
         // Virtual Touch State
         this.touchLeft = false;
         this.touchRight = false;
+        this.touchDown = false;
         this.touchJump = false;
         this.touchSprint = false;
 
@@ -76,6 +77,7 @@ class InputHandler {
         };
 
         bindTouch('btn-left', () => { this.touchLeft = true; }, () => { this.touchLeft = false; });
+        bindTouch('btn-down', () => { this.touchDown = true; }, () => { this.touchDown = false; });
         bindTouch('btn-right', () => { this.touchRight = true; }, () => { this.touchRight = false; });
         bindTouch('btn-jump', () => {
             this.touchJump = true;
@@ -118,7 +120,7 @@ class InputHandler {
     }
 
     isCrouch() {
-        return this.keys['ArrowDown'] || this.keys['KeyS'];
+        return this.keys['ArrowDown'] || this.keys['KeyS'] || this.touchDown;
     }
 
     isSprint() {

@@ -53,6 +53,11 @@ class Game {
 
         this.state = 'TITLE';
         window.uiManager.showStartScreen(this.playerName, this.getLeaderboard());
+        this.fetchGlobalLeaderboard(10).then(scores => {
+            if (this.state === 'TITLE' && window.uiManager) {
+                window.uiManager.renderLeaderboard('start-leaderboard-list', scores);
+            }
+        });
 
         this.resize();
         window.addEventListener('resize', () => this.resize());
@@ -115,11 +120,41 @@ class Game {
         ];
     }
 
+    async fetchGlobalLeaderboard(limit = 10) {
+        try {
+            const res = await fetch(`/api/leaderboard?limit=${limit}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success && Array.isArray(data.scores) && data.scores.length > 0) {
+                    localStorage.setItem('studio_mario_leaderboard', JSON.stringify(data.scores));
+                    return data.scores;
+                }
+            }
+        } catch (e) {
+            // Graceful fallback to local cache when offline or API unreachable
+            console.warn('Global leaderboard offline, using local storage cache.');
+        }
+        return this.getLeaderboard();
+    }
+
     saveScoreToLeaderboard(name, finalScore) {
         let board = this.getLeaderboard();
-        board.push({ name: name || 'Player', score: finalScore });
+        const cleanName = (name || 'Player').trim().slice(0, 12);
+        const nameLower = cleanName.toLowerCase();
+
+        // Check if player name already exists (case-insensitive)
+        const existingIndex = board.findIndex(item => (item.name || '').toLowerCase() === nameLower);
+        if (existingIndex !== -1) {
+            if (finalScore > board[existingIndex].score) {
+                board[existingIndex].score = finalScore;
+                board[existingIndex].name = cleanName;
+            }
+        } else {
+            board.push({ name: cleanName, score: finalScore });
+        }
+
         board.sort((a, b) => b.score - a.score);
-        board = board.slice(0, 5); // Keep top 5
+        board = board.slice(0, 10); // Keep top 10 unique
         localStorage.setItem('studio_mario_leaderboard', JSON.stringify(board));
 
         if (finalScore > this.highScore) {
@@ -129,7 +164,32 @@ class Game {
         } else {
             this.isNewHighScore = false;
         }
+
+        // Asynchronously post to MongoDB backend
+        this.submitScoreToGlobalLeaderboard(cleanName, finalScore);
+
         return board;
+    }
+
+    async submitScoreToGlobalLeaderboard(name, score) {
+        try {
+            const res = await fetch('/api/scores', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, score })
+            });
+            if (res.ok) {
+                const result = await res.json();
+                if (result.success) {
+                    const freshScores = await this.fetchGlobalLeaderboard(10);
+                    if (window.uiManager) {
+                        window.uiManager.refreshActiveLeaderboards(freshScores, name, score);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Score submission to global backend failed, saved in local storage.');
+        }
     }
 
     triggerScreenShake(intensity = 6, duration = 0.2) {
@@ -164,6 +224,11 @@ class Game {
     returnToTitle() {
         this.state = 'TITLE';
         window.uiManager.showStartScreen(this.playerName, this.getLeaderboard());
+        this.fetchGlobalLeaderboard(10).then(scores => {
+            if (this.state === 'TITLE' && window.uiManager) {
+                window.uiManager.renderLeaderboard('start-leaderboard-list', scores);
+            }
+        });
     }
 
     resetGame() {
